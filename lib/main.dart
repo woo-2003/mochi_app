@@ -1,7 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:mochi_app/screens/auth/login_screen.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:mochi_app/firebase_options.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  // Firebase SDK를 Flutter 앱이 실행되기 전에 초기화합니다.
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   runApp(const MyApp());
 }
 

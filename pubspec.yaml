@@ -9,6 +9,10 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  # Firebase 연동을 위한 핵심 패키지들
+  firebase_core: ^3.3.0
+  firebase_auth: ^5.1.2
+  google_sign_in: ^6.2.1
 
 dev_dependencies:
   flutter_test:
