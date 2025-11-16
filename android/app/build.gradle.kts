@@ -31,6 +31,8 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        // 65k 메서드 제한을 초과하는 Firebase 플러그인들을 위한 MultiDex 활성화
+        multiDexEnabled = true
     }
 
     buildTypes {

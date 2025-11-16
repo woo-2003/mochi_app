@@ -2,6 +2,7 @@
 // 비즈니스 로직은 UI와 분리하여 유지보수성을 높이기 위해 서비스 계층으로 구성합니다.
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:mochi_app/services/database_service.dart';
 
 /// Firebase 인증과 Google 로그인을 담당하는 서비스입니다.
 ///
@@ -47,6 +48,11 @@ class AuthService {
       final UserCredential userCredential = await _firebaseAuth
           .signInWithCredential(credential);
 
+      // (신규) 로그인 성공 시, 유저 정보를 DB에 저장
+      if (userCredential.user != null) {
+        await DatabaseService.instance.saveUser(userCredential.user!);
+      }
+
       // 5. 로그인 성공 시 Firebase User 객체를 반환하고, 실패 시 null 반환
       return userCredential.user;
     } on FirebaseAuthException catch (e) {
@@ -60,6 +66,25 @@ class AuthService {
       // ignore: avoid_print
       print('Unknown error during Google sign-in: $e');
       return null;
+    }
+  }
+
+  /// 사용자를 로그아웃 처리합니다.
+  ///
+  /// Google 계정과 Firebase Auth 양쪽에서 모두 로그아웃하여,
+  /// 다음 로그인 시 다시 로그인 팝업이 나타나도록 합니다.
+  Future<void> signOut() async {
+    try {
+      // 1. Google 계정에서 로그아웃 (다시 로그인 팝업을 띄우기 위함)
+      await _googleSignIn.signOut();
+
+      // 2. Firebase Auth에서 로그아웃
+      await _firebaseAuth.signOut();
+    } catch (e) {
+      // 로그아웃 과정에서 오류가 발생한 경우 로깅합니다.
+      // ignore: avoid_print
+      print('Error during sign out: $e');
+      rethrow;
     }
   }
 }
