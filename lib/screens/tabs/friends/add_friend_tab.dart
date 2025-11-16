@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
+import 'package:mochi_app/models/user_model.dart';
+import 'package:mochi_app/services/auth_service.dart';
 import 'package:mochi_app/services/database_service.dart';
 
 /// 모찌 추가 탭 화면
@@ -18,10 +20,14 @@ class _AddFriendTabState extends State<AddFriendTab> {
   List<Contact> _contacts = [];
 
   /// 모찌에 가입한 친구 목록을 저장하는 상태 변수입니다.
-  List<Map<String, dynamic>> _foundMochiFriends = [];
+  List<UserModel> _foundMochiFriends = [];
 
   /// 초대할 친구 목록을 저장하는 상태 변수입니다.
   List<Contact> _contactsToInvite = [];
+
+  /// 친구 요청을 보낸 친구의 UID 목록을 저장하는 상태 변수입니다.
+  /// (UI에서 버튼 상태를 관리하기 위함)
+  Set<String> _requestedFriendUids = {};
 
   /// 로딩 상태를 나타내는 상태 변수입니다.
   bool _isLoading = true;
@@ -55,12 +61,24 @@ class _AddFriendTabState extends State<AddFriendTab> {
 
       // 4. DB에서 '모찌' 친구 검색
       if (phoneNumbers.isNotEmpty) {
-        final foundFriends =
-            await DatabaseService.instance.findFriendsFromContacts(phoneNumbers);
+        // 현재 로그인한 유저의 uid를 가져옵니다.
+        final currentUserUid = AuthService.currentUser?.uid;
+        if (currentUserUid == null) {
+          if (mounted) {
+            setState(() {
+              _isLoading = false;
+            });
+          }
+          return;
+        }
+
+        // 자기 자신을 제외한 친구 목록을 검색합니다.
+        final foundFriends = await DatabaseService.instance
+            .findFriendsFromContacts(currentUserUid, phoneNumbers);
 
         // 5. '모찌' 친구와 '초대할 친구' 분류
         List<Contact> toInvite = [];
-        List<Map<String, dynamic>> mochiFriends = [];
+        List<UserModel> mochiFriends = [];
 
         for (var contact in contacts) {
           if (contact.phones.isEmpty) continue;
@@ -68,11 +86,15 @@ class _AddFriendTabState extends State<AddFriendTab> {
 
           // DB 검색 결과에서 일치하는 친구 찾기
           var matchingFriend = foundFriends.firstWhere(
-            (friend) => friend['phoneNumber'] == contactPhone,
-            orElse: () => {}, // empty map
+            (friend) => friend.phoneNumber == contactPhone,
+            orElse: () => UserModel(
+              uid: '',
+              email: '',
+              displayName: '',
+            ), // 빈 UserModel
           );
 
-          if (matchingFriend.isNotEmpty) {
+          if (matchingFriend.uid.isNotEmpty) {
             // 일치 -> '모찌' 친구
             mochiFriends.add(matchingFriend);
           } else {
@@ -103,6 +125,39 @@ class _AddFriendTabState extends State<AddFriendTab> {
           _isLoading = false;
         });
       }
+    }
+  }
+
+  /// 친구 요청을 전송하는 메서드입니다.
+  Future<void> _sendFriendRequest(String friendUid) async {
+    try {
+      // DatabaseService를 통해 친구 요청을 전송합니다.
+      await DatabaseService.instance.sendFriendRequest(friendUid);
+
+      if (!mounted) {
+        return;
+      }
+
+      // (UI 업데이트) 요청 보낸 버튼을 '요청함' (회색)으로 변경 (간단한 상태 관리)
+      setState(() {
+        _requestedFriendUids.add(friendUid);
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('친구 요청을 보냈습니다.'),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('친구 요청 전송 중 오류가 발생했습니다: $e'),
+        ),
+      );
     }
   }
 
@@ -142,15 +197,25 @@ class _AddFriendTabState extends State<AddFriendTab> {
                 ),
               ),
             ),
-            ..._foundMochiFriends.map((friend) {
+            ..._foundMochiFriends.asMap().entries.map((entry) {
+              final index = entry.key;
+              final friend = entry.value;
+              final isRequested = _requestedFriendUids.contains(friend.uid);
+
               return ListTile(
-                title: Text(friend['displayName'] ?? '이름 없음'),
-                subtitle: Text(friend['phoneNumber'] ?? '전화번호 없음'),
+                title: Text(friend.displayName),
+                subtitle: Text(friend.phoneNumber ?? '전화번호 없음'),
                 trailing: ElevatedButton(
-                  onPressed: () {
-                    // TODO: 친구 추가 기능 구현
-                  },
-                  child: const Text('친구 추가'),
+                  onPressed: isRequested
+                      ? null
+                      : () async {
+                          // TODO: 이미 요청했거나 친구인 경우 버튼 비활성화
+                          await _sendFriendRequest(friend.uid);
+                        },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: isRequested ? Colors.grey : null,
+                  ),
+                  child: Text(isRequested ? '요청함' : '친구 추가'),
                 ),
               );
             }),

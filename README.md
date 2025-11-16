@@ -113,5 +113,47 @@
     * A) `flutter_contacts`로 모든 연락처를 가져옵니다.
     * B) 전화번호 목록을 추출하여 `findFriendsFromContacts`를 호출합니다.
     * C) DB 결과와 연락처를 비교하여, `_foundMochiFriends`와 `_contactsToInvite` 두 개의 리스트로 분류합니다.
-3.  **UI 수정:** `AddFriendTab`의 `body`를 "모찌에 가입한 친구" 섹션과 "초대하기" 섹션으로 나누어 표시하도록 UI를 전면 수정했습니다.
+3.  **UI 수정:** `AddFriendTab`의 `body`를 "모찌에 가입한 친구" 섹션과 "초대하기" 섹션으로 나누어 표시하도록 UI를 전면 수정했습니다. (UI 분리 확인)
+4.  **주석:** 모든 신규 코드에 한국어 주석을 추가했습니다.
+
+## [오퍼레이션 11: 친구 요청] (2025-11-16)
+
+### 작업 내용
+
+1.  **UserModel 생성:** `users` 컬렉션 데이터를 Dart 객체로 다루기 위해 `lib/models/user_model.dart`를 생성했습니다.
+2.  **AuthService 수정:** `AuthService.currentUser` getter를 추가하여 현재 로그인한 유저의 `uid`에 쉽게 접근할 수 있도록 수정했습니다.
+3.  **DB 서비스 수정:**
+    * `findFriendsFromContacts`가 `List<UserModel>`을 반환하도록 리팩토링했습니다.
+    * `friend_requests` 컬렉션에 'pending' 상태의 요청 문서를 생성하는 `sendFriendRequest` 메서드를 '신규' 구현했습니다.
+4.  **'모찌 추가' 탭 수정:** `[친구 추가]` 버튼을 눌렀을 때, `sendFriendRequest`가 호출되도록 `onPressed` 로직을 '연결'했습니다.
+5.  **[버그 수정]** '자기 자신'에게 친구 요청을 보내는 오류를 수정함: (1) `findFriendsFromContacts` 쿼리 결과에서 '자기 자신'의 uid를 필터링 (2) `sendFriendRequest` 메서드에 'fromUid == toUid' 방어 로직 추가 (3) `saveUser` 메서드에서 `displayName` 기본값('Mochi User') 설정. (버그 수정 성공 확인)
+6.  **주석:** 모든 신규 코드에 한국어 주석을 추가했습니다.
+
+## [오퍼레이션 12: 알림 탭] (2025-11-16)
+
+### 작업 내용
+
+1.  **DB 서비스 수정:** '나에게 온 보류 중인' 친구 요청을 실시간(`Stream`)으로 감지하는 `getFriendRequests` 메서드를 구현했습니다. 또한, `uid`로 사용자 정보를 가져오는 `getUserProfile` 메서드를 추가했습니다.
+2.  **'알림' 탭 수정:** `FriendRequestsTab`에 `StreamBuilder` (요청 목록)와 `FutureBuilder` (요청자 정보)를 '중첩'하여, '나에게' 친구 요청을 보낸 사람의 '이름'이 목록에 뜨도록 UI를 구현했습니다.
+3.  **UI 추가:** 요청 목록에 `[수락]` / `[거절]` 버튼 UI를 추가했습니다. (기능 미연결)
+4.  **[버그 수정]** '알림' 탭에서 존재하지 않는 `fromUid`를 조회할 때 `null` 충돌이 발생하던 문제를 수정함: (1) `getUserProfile`이 `UserModel?` (Nullable)을 반환하도록 수정. (2) `FutureBuilder`에서 `null` 체크 로직을 추가하여 '알 수 없는 사용자'로 안전하게 표시함. ('알 수 없는 사용자' 테스트 성공)
+5.  **주석:** 모든 신규 코드에 한국어 주석을 추가했습니다.
+
+## [오퍼레이션 13: 친구 수락] (2025-11-16)
+
+### 작업 내용
+
+1.  **보안 규칙 적용:** Firestore '규칙' 탭을 수정하여, 'users', 'friend_requests', 'users/{userId}/friends' 하위 컬렉션에 대한 '본인'만 수정 가능한 보안 규칙을 적용했습니다.
+2.  **트랜잭션 구현:** `DatabaseService`에 `acceptFriendRequest` 메서드를 추가했습니다. 이 메서드는 '트랜잭션'을 사용하여 3가지 작업(요청 상태 변경, 내 친구 목록 추가, 상대 친구 목록 추가)을 '안전하게' 동시에 처리합니다.
+3.  **'알림' 탭 연결:** `[수락]` 버튼의 `onPressed:`에 `acceptFriendRequest` 로직을 '연결'했습니다.
+4.  **테스트:** '보안 규칙' 적용까지만 기록하고, '테스트'는 (Op 14로) 건너뛰었음.
+5.  **주석:** 모든 신규 코드에 한국어 주석을 추가했습니다.
+
+## [오퍼레이션 14: "내 모찌" 탭] (2025-11-16)
+
+### 작업 내용
+
+1.  **테스트 시뮬레이션:** '친구 수락' UI 테스트가 'null' 사용자로 인해 교착 상태에 빠져, Firestore 콘솔에서 '수동'으로 `users/{내 uid}/friends/{fake_friend_abc}` 문서를 생성하여 '친구 수락'이 성공했다고 '가정'함.
+2.  **DB 서비스 수정:** `users/{uid}/friends` 하위 컬렉션을 실시간(`Stream`)으로 읽어오는 `getMyFriendsStream` 메서드를 구현했습니다.
+3.  **'내 모찌' 탭 수정:** `MyFriendsTab`에 `StreamBuilder` (친구 목록)와 `FutureBuilder` (친구 상세 정보)를 '중첩'하여, '나의 친구' 목록이 이름과 전화번호와 함께 표시되도록 UI를 구현했습니다.
 4.  **주석:** 모든 신규 코드에 한국어 주석을 추가했습니다.

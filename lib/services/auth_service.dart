@@ -19,6 +19,11 @@ class AuthService {
 
   AuthService._internal();
 
+  /// 현재 로그인한 사용자를 반환하는 getter입니다.
+  ///
+  /// 로그인하지 않은 경우 null을 반환합니다.
+  static User? get currentUser => FirebaseAuth.instance.currentUser;
+
   /// Google 로그인 흐름을 처리한 뒤 Firebase 사용자 정보를 반환합니다.
   Future<User?> signInWithGoogle() async {
     try {
