@@ -2,6 +2,7 @@
 // 사용자 정보 저장 및 조회 등의 데이터베이스 작업을 처리합니다.
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:location/location.dart';
 import 'package:mochi_app/models/user_model.dart';
 import 'package:mochi_app/services/auth_service.dart';
 
@@ -326,6 +327,74 @@ class DatabaseService {
       // 친구 목록 스트림 생성 중 오류가 발생한 경우 로깅합니다.
       // ignore: avoid_print
       print('Error getting my friends stream: $e');
+      return const Stream.empty();
+    }
+  }
+
+  /// 사용자의 현재 위치를 Firestore에 업데이트합니다.
+  ///
+  /// [locationData] 업데이트할 위치 데이터
+  /// `locations` 컬렉션에 `uid`를 문서 ID로 하여 위치 정보를 저장합니다.
+  Future<void> updateUserLocation(LocationData locationData) async {
+    try {
+      // 1. 현재 로그인한 유저의 `uid`를 가져옴.
+      final String? currentUserUid = AuthService.currentUser?.uid;
+      if (currentUserUid == null) {
+        throw Exception('로그인이 필요합니다.');
+      }
+
+      // 위치 데이터가 유효한지 확인합니다.
+      if (locationData.latitude == null || locationData.longitude == null) {
+        throw Exception('유효하지 않은 위치 데이터입니다.');
+      }
+
+      // 2. `locations` 컬렉션을 참조.
+      final locationsCollection = _firestore.collection('locations');
+
+      // 3. `doc(currentUserUid).set()`을 사용하여 문서를 '덮어쓰기' (업데이트).
+      // 4. 저장할 데이터:
+      //    - 'position': `GeoPoint(locationData.latitude!, locationData.longitude!)`
+      //    - 'updatedAt': `Timestamp.now()`
+      await locationsCollection.doc(currentUserUid).set({
+        'position': GeoPoint(
+          locationData.latitude!,
+          locationData.longitude!,
+        ),
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true)); // merge: true를 사용하여 기존 필드를 유지하면서 업데이트
+    } catch (e) {
+      // 위치 업데이트 중 오류가 발생한 경우 로깅합니다.
+      // ignore: avoid_print
+      print('Error updating user location: $e');
+      rethrow;
+    }
+  }
+
+  /// 친구들의 실시간 위치를 감지하는 스트림을 반환합니다.
+  ///
+  /// [friendUids] 조회할 친구들의 UID 목록
+  /// 반환값: 친구 위치 문서들의 스냅샷 스트림
+  Stream<QuerySnapshot> getFriendsLocationsStream(List<String> friendUids) {
+    try {
+      // 1. `friendUids` 리스트가 '비어있으면' 빈 스트림(Stream.empty())을 반환
+      //    (Firestore 'whereIn'은 빈 리스트를 허용 안 함)
+      if (friendUids.isEmpty) {
+        return const Stream.empty();
+      }
+
+      // 2. `locations` 컬렉션을 참조.
+      final locationsCollection = _firestore.collection('locations');
+
+      // 3. `where(FieldPath.documentId, whereIn: friendUids)` 쿼리를 사용해,
+      //    '내 친구'들의 'uid'에 해당하는 위치 문서만 '필터링'.
+      // 4. `.snapshots()`를 반환하여 '실시간' 위치 스트림을 만듦.
+      return locationsCollection
+          .where(FieldPath.documentId, whereIn: friendUids)
+          .snapshots();
+    } catch (e) {
+      // 친구 위치 스트림 생성 중 오류가 발생한 경우 로깅합니다.
+      // ignore: avoid_print
+      print('Error getting friends locations stream: $e');
       return const Stream.empty();
     }
   }

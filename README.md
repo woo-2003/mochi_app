@@ -175,6 +175,26 @@
 1.  **권한 설정:** `AndroidManifest.xml`에 `ACCESS_FINE_LOCATION` 및 `ACCESS_COARSE_LOCATION` 권한 2줄을 추가했습니다.
 2.  **패키지 설치:** `location` 패키지를 `pubspec.yaml`에 추가했습니다.
 3.  **'지도' 탭 수정:** `MapScreen`의 `initState`에서 `location` 패키지를 사용해 'GPS 권한'과 '서비스'를 요청하도록 로직을 추가했습니다.
-4.  **카메라 이동:** 권한이 허용되면, '현재 GPS 위치'를 가져와 `GoogleMapController.animateCamera`를 호출하여 지도를 '내 위치'로 이동시켰습니다.
+4.  **카메라 이동:** 권한이 허용되면, '현재 GPS 위치'를 가져와 `GoogleMapController.animateCamera`를 호출하여 지도를 '내 위치'로 이동시켰습니다. (GPS 팝업, 카메라 이동 성공)
 5.  **UI 수정:** `GoogleMap` 위젯에 `myLocationEnabled: true` (파란 점)와 `myLocationButtonEnabled: true` 옵션을 활성화했습니다.
 6.  **주석:** 모든 신규 코드에 한국어 주석을 추가했습니다.
+
+## [오퍼레이션 17: "실시간 위치 공유"] (2025-11-17)
+
+### 작업 내용
+
+1.  **Firestore 규칙:** `locations` 컬렉션에 '본인 쓰기 / 인증자 읽기' 보안 규칙을 '추가'했습니다.
+2.  **DB 서비스 수정:** `locations` 컬렉션에 `uid`를 문서 ID로 하여 `GeoPoint`와 `Timestamp`를 '덮어쓰는(set)' `updateUserLocation` 메서드를 구현했습니다.
+3.  **'지도' 탭 수정:** `MapScreen`이 `location.onLocationChanged` 스트림을 '구독(listen)'하도록 수정했습니다. GPS 위치가 변경될 때마다 `updateUserLocation`을 호출하여 '내 위치'를 Firestore에 실시간으로 공유합니다. (locations 컬렉션 생성 성공)
+4.  **배터리 최적화:** `dispose()` 메서드에서 `_locationSubscription.cancel()`을 호출하여, 화면이 꺼지면 GPS 구독을 중지하도록 구현했습니다.
+5.  **주석:** 모든 신규 코드에 한국어 주석을 추가했습니다.
+
+## [오퍼레이션 18 (수정): "Reactive 친구 마커"] (2025-11-17)
+
+### 작업 내용
+
+1.  **[치명적 버그 수정]** `setState() called during build`: `StreamBuilder`의 `builder` 함수 내에서 `setState`를 호출하여 발생한 ANR(앱 응답 없음) 오류를 수정했습니다.
+2.  **로직 전면 수정:** `MapScreen`에서 `setState` 로직을 '전부 제거'했습니다.
+3.  **Reactive UI:** `StreamBuilder` (친구 목록) 안에 `StreamBuilder` (친구 위치)를 중첩하는 'Reactive' 방식으로 변경했습니다.
+4.  **마커 렌더링:** '친구 위치' `StreamBuilder`의 `builder`가 '실행될 때마다' `Set<Marker>`를 '새로' 생성하여 `GoogleMap` 위젯에 전달, '자동'으로 UI가 갱신되도록 수정했습니다.
+5.  **주석:** 모든 신규 코드에 한국어 주석을 추가했습니다.
