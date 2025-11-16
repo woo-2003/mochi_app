@@ -100,5 +100,52 @@ class DatabaseService {
       rethrow;
     }
   }
+
+  /// 연락처 목록에서 모찌에 가입한 친구를 찾습니다.
+  ///
+  /// [phoneNumbers] 검색할 전화번호 목록
+  /// 반환값: 모찌에 가입한 친구들의 데이터 리스트 (TODO: User 모델로 변환)
+  Future<List<Map<String, dynamic>>> findFriendsFromContacts(
+      List<String> phoneNumbers) async {
+    try {
+      // 1. 'users' 컬렉션을 참조.
+      final usersCollection = _firestore.collection('users');
+
+      // 2. `where('phoneNumber', whereIn: phoneNumbers)` 쿼리를 사용해,
+      //    내 연락처 목록(phoneNumbers)에 포함된 번호를 가진 사용자를 '한 번에' 검색.
+      //    참고: Firestore의 whereIn은 최대 10개의 값을 지원하므로,
+      //    phoneNumbers가 10개를 초과하면 배치로 나누어 처리해야 합니다.
+      if (phoneNumbers.isEmpty) {
+        return [];
+      }
+
+      // whereIn은 최대 10개까지만 지원하므로, 10개씩 나누어 처리합니다.
+      List<Map<String, dynamic>> allResults = [];
+
+      for (int i = 0; i < phoneNumbers.length; i += 10) {
+        final batch = phoneNumbers.skip(i).take(10).toList();
+
+        // 3. 쿼리 스냅샷(snapshot)을 가져옴.
+        final querySnapshot = await usersCollection
+            .where('phoneNumber', whereIn: batch)
+            .get();
+
+        // 4. 스냅샷의 'docs'를 순회하며 `Map<String, dynamic>` 데이터 리스트를 반환.
+        //    (TODO: User 모델로 변환)
+        for (var doc in querySnapshot.docs) {
+          final data = doc.data();
+          data['uid'] = doc.id; // 문서 ID도 포함
+          allResults.add(data);
+        }
+      }
+
+      return allResults;
+    } catch (e) {
+      // 친구 검색 중 오류가 발생한 경우 로깅합니다.
+      // ignore: avoid_print
+      print('Error finding friends from contacts: $e');
+      return [];
+    }
+  }
 }
 

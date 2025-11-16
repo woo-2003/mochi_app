@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
+import 'package:mochi_app/services/database_service.dart';
 
 /// 모찌 추가 탭 화면
 ///
 /// 새로운 친구(모찌)를 검색하거나 연락처에서 추가하는 화면입니다.
+/// 연락처와 DB를 비교하여 이미 가입한 친구와 초대할 친구를 분류합니다.
 class AddFriendTab extends StatefulWidget {
   const AddFriendTab({super.key});
 
@@ -15,6 +17,12 @@ class _AddFriendTabState extends State<AddFriendTab> {
   /// 연락처 목록을 저장하는 상태 변수입니다.
   List<Contact> _contacts = [];
 
+  /// 모찌에 가입한 친구 목록을 저장하는 상태 변수입니다.
+  List<Map<String, dynamic>> _foundMochiFriends = [];
+
+  /// 초대할 친구 목록을 저장하는 상태 변수입니다.
+  List<Contact> _contactsToInvite = [];
+
   /// 로딩 상태를 나타내는 상태 변수입니다.
   bool _isLoading = true;
 
@@ -25,22 +33,71 @@ class _AddFriendTabState extends State<AddFriendTab> {
     _loadContacts();
   }
 
-  /// 연락처를 로드하는 메서드입니다.
+  /// 연락처를 로드하고, '모찌' 친구와 '초대할 친구'를 분류합니다.
   Future<void> _loadContacts() async {
-    // 1. 먼저 연락처 권한을 요청합니다.
+    setState(() {
+      _isLoading = true;
+    });
+
+    // 1. 권한 요청
     if (await FlutterContacts.requestPermission()) {
-      // 2. 권한이 허용되면, 연락처를 가져옵니다.
+      // 2. 연락처 가져오기
       List<Contact> contacts = await FlutterContacts.getContacts(
-        withProperties: true, // 전화번호, 이메일 등 속성 포함
+        withProperties: true,
+        withPhoto: true, // 사진도 가져오기
       );
-      if (mounted) {
-        setState(() {
-          _contacts = contacts; // 상태 변수에 저장
-          _isLoading = false; // 로딩 완료
-        });
+
+      // 3. 연락처에서 전화번호 목록 추출 (TODO: 010-1234-5678 형식으로 정규화 필요)
+      List<String> phoneNumbers = contacts
+          .where((c) => c.phones.isNotEmpty)
+          .map((c) => c.phones.first.number)
+          .toList();
+
+      // 4. DB에서 '모찌' 친구 검색
+      if (phoneNumbers.isNotEmpty) {
+        final foundFriends =
+            await DatabaseService.instance.findFriendsFromContacts(phoneNumbers);
+
+        // 5. '모찌' 친구와 '초대할 친구' 분류
+        List<Contact> toInvite = [];
+        List<Map<String, dynamic>> mochiFriends = [];
+
+        for (var contact in contacts) {
+          if (contact.phones.isEmpty) continue;
+          String contactPhone = contact.phones.first.number;
+
+          // DB 검색 결과에서 일치하는 친구 찾기
+          var matchingFriend = foundFriends.firstWhere(
+            (friend) => friend['phoneNumber'] == contactPhone,
+            orElse: () => {}, // empty map
+          );
+
+          if (matchingFriend.isNotEmpty) {
+            // 일치 -> '모찌' 친구
+            mochiFriends.add(matchingFriend);
+          } else {
+            // 불일치 -> '초대할' 친구
+            toInvite.add(contact);
+          }
+        }
+
+        if (mounted) {
+          setState(() {
+            _contacts = contacts; // 원본
+            _foundMochiFriends = mochiFriends; // 찾은 친구
+            _contactsToInvite = toInvite; // 초대할 친구
+            _isLoading = false;
+          });
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
       }
     } else {
-      // 3. 권한이 거부되면, 로딩을 끄고 빈 화면을 표시
+      // 권한 거부
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -69,21 +126,65 @@ class _AddFriendTabState extends State<AddFriendTab> {
       );
     }
 
-    // 연락처 목록을 ListView로 표시합니다.
+    // 두 섹션을 표시하는 ListView
     return Scaffold(
-      body: ListView.builder(
-        itemCount: _contacts.length,
-        itemBuilder: (context, index) {
-          final contact = _contacts[index];
-          // TODO: 여기서 '연락처에 있는 모찌 유저'와 '내 연락처(전체)'를 분리해야 함
-          // 지금은 모든 연락처를 임시로 표시합니다. (기능 테스트용)
-          return ListTile(
-            title: Text(contact.displayName),
-            subtitle: contact.phones.isNotEmpty
-                ? Text(contact.phones.first.number)
-                : const Text('전화번호 없음'),
-          );
-        },
+      body: ListView(
+        children: [
+          // 섹션 1: 모찌에 가입한 친구
+          if (_foundMochiFriends.isNotEmpty) ...[
+            const Padding(
+              padding: EdgeInsets.all(16.0),
+              child: Text(
+                '모찌에 가입한 친구',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            ..._foundMochiFriends.map((friend) {
+              return ListTile(
+                title: Text(friend['displayName'] ?? '이름 없음'),
+                subtitle: Text(friend['phoneNumber'] ?? '전화번호 없음'),
+                trailing: ElevatedButton(
+                  onPressed: () {
+                    // TODO: 친구 추가 기능 구현
+                  },
+                  child: const Text('친구 추가'),
+                ),
+              );
+            }),
+            const Divider(),
+          ],
+
+          // 섹션 2: 초대하기
+          if (_contactsToInvite.isNotEmpty) ...[
+            const Padding(
+              padding: EdgeInsets.all(16.0),
+              child: Text(
+                '초대하기',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            ..._contactsToInvite.map((contact) {
+              return ListTile(
+                title: Text(contact.displayName),
+                subtitle: contact.phones.isNotEmpty
+                    ? Text(contact.phones.first.number)
+                    : const Text('전화번호 없음'),
+                trailing: ElevatedButton(
+                  onPressed: () {
+                    // TODO: 초대 기능 구현
+                  },
+                  child: const Text('초대'),
+                ),
+              );
+            }),
+          ],
+        ],
       ),
     );
   }

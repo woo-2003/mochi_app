@@ -101,5 +101,17 @@
 1.  **Firestore 색인:** `users` 컬렉션의 `phoneNumber` 필드는 '단일 필드'로 Firebase가 '자동' 색인함을 확인함. (별도 콘솔 작업 불필요)
 2.  **전화번호 화면:** 신규 사용자의 전화번호를 입력받는 `PhoneVerificationScreen` UI를 생성했습니다.
 3.  **DB 서비스 수정:** `checkIfUserHasPhoneNumber` (확인), `savePhoneNumber` (저장) 메서드를 `DatabaseService`에 추가했습니다.
-4.  **AuthGate 수정:** `StreamBuilder` (로그인)와 `FutureBuilder` (DB 확인)를 '중첩'하여, 신규 사용자가 `PhoneVerificationScreen`을 강제로 거치도록 라우팅 로직을 전면 수정했습니다.
+4.  **AuthGate 수정:** `StreamBuilder` (로그인)와 `FutureBuilder` (DB 확인)를 '중첩'하여, 신규 사용자가 `PhoneVerificationScreen`을 강제로 거치도록 라우팅 로직을 전면 수정했습니다. (전화번호 입력/저장 후 자동으로 메인 화면으로 이동하는 것을 확인함)
 5.  **주석:** 모든 신규 코드에 한국어 주석을 추가했습니다.
+
+## [오퍼레이션 10: 친구 찾기 로직] (2025-11-16)
+
+### 작업 내용
+
+1.  **DB 서비스 수정:** `DatabaseService`에 `findFriendsFromContacts` 메서드를 추가했습니다. 이 메서드는 'phoneNumber' 리스트를 받아 `whereIn` 쿼리로 'users' 컬렉션을 검색합니다.
+2.  **'모찌 추가' 탭 수정:** `_loadContacts` 로직을 전면 수정했습니다.
+    * A) `flutter_contacts`로 모든 연락처를 가져옵니다.
+    * B) 전화번호 목록을 추출하여 `findFriendsFromContacts`를 호출합니다.
+    * C) DB 결과와 연락처를 비교하여, `_foundMochiFriends`와 `_contactsToInvite` 두 개의 리스트로 분류합니다.
+3.  **UI 수정:** `AddFriendTab`의 `body`를 "모찌에 가입한 친구" 섹션과 "초대하기" 섹션으로 나누어 표시하도록 UI를 전면 수정했습니다.
+4.  **주석:** 모든 신규 코드에 한국어 주석을 추가했습니다.
