@@ -17,6 +17,10 @@ dependencies:
   cloud_firestore: ^5.1.0
   # 연락처 접근 및 권한 요청을 위한 패키지 (최신 유지보수 패키지로 교체)
   flutter_contacts: ^1.1.8
+  # Google Maps 위젯을 위한 핵심 패키지
+  google_maps_flutter: ^2.6.1
+  # 실시간 GPS 위치 추적을 위한 패키지
+  location: ^6.0.2
 
 dev_dependencies:
   flutter_test:

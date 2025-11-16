@@ -157,3 +157,24 @@
 2.  **DB 서비스 수정:** `users/{uid}/friends` 하위 컬렉션을 실시간(`Stream`)으로 읽어오는 `getMyFriendsStream` 메서드를 구현했습니다.
 3.  **'내 모찌' 탭 수정:** `MyFriendsTab`에 `StreamBuilder` (친구 목록)와 `FutureBuilder` (친구 상세 정보)를 '중첩'하여, '나의 친구' 목록이 이름과 전화번호와 함께 표시되도록 UI를 구현했습니다.
 4.  **주석:** 모든 신규 코드에 한국어 주석을 추가했습니다.
+
+## [오퍼레이션 15: "Hello, Map!"] (2025-11-16)
+
+### 작업 내용
+
+1.  **패키지 설치:** `google_maps_flutter: ^2.6.1` 패키지를 `pubspec.yaml`에 추가했습니다.
+2.  **Android API 키 설정:** `AndroidManifest.xml`에 Google Maps API 키를 위한 `meta-data`를 추가했습니다. (주의: `"YOUR_API_KEY_HERE"` 부분을 팀장님이 복사한 실제 API 키로 수정해야 함)
+3.  **Android Gradle 확인:** `build.gradle.kts`에서 `minSdkVersion`이 `flutter.minSdkVersion`으로 설정되어 있음을 확인했습니다. (Google Maps는 최소 SDK 21이 필요하며, Flutter 기본값이 21 이상이므로 문제 없음)
+4.  **지도 화면 수정:** `MapScreen`을 `StatefulWidget`으로 변경하고, `GoogleMap` 위젯을 추가하여 서울 시청 근처를 초기 위치로 하는 지도를 표시하도록 구현했습니다. (지도 렌더링 성공)
+5.  **주석:** 모든 신규 코드에 한국어 주석을 추가했습니다.
+
+## [오퍼레이션 16: "내 위치 찾기"] (2025-11-17)
+
+### 작업 내용
+
+1.  **권한 설정:** `AndroidManifest.xml`에 `ACCESS_FINE_LOCATION` 및 `ACCESS_COARSE_LOCATION` 권한 2줄을 추가했습니다.
+2.  **패키지 설치:** `location` 패키지를 `pubspec.yaml`에 추가했습니다.
+3.  **'지도' 탭 수정:** `MapScreen`의 `initState`에서 `location` 패키지를 사용해 'GPS 권한'과 '서비스'를 요청하도록 로직을 추가했습니다.
+4.  **카메라 이동:** 권한이 허용되면, '현재 GPS 위치'를 가져와 `GoogleMapController.animateCamera`를 호출하여 지도를 '내 위치'로 이동시켰습니다.
+5.  **UI 수정:** `GoogleMap` 위젯에 `myLocationEnabled: true` (파란 점)와 `myLocationButtonEnabled: true` 옵션을 활성화했습니다.
+6.  **주석:** 모든 신규 코드에 한국어 주석을 추가했습니다.
