@@ -38,6 +38,7 @@ class DatabaseService {
           'uid': user.uid,
           'email': user.email ?? '',
           'displayName': user.displayName ?? '',
+          'phoneNumber': null, // 필드 존재 여부를 쉽게 파악하기 위해 null로 초기화
           'createdAt': FieldValue.serverTimestamp(),
         });
       }
@@ -47,6 +48,55 @@ class DatabaseService {
       // ignore: avoid_print
       print('Error saving user to Firestore: $e');
       // 실제 프로덕션 환경에서는 에러 핸들링을 더 세밀하게 처리해야 합니다.
+      rethrow;
+    }
+  }
+
+  /// 사용자가 전화번호를 가지고 있는지 확인합니다.
+  ///
+  /// [uid] 확인할 사용자의 UID
+  /// 반환값: 전화번호가 있으면 `true`, 없으면 `false`
+  Future<bool> checkIfUserHasPhoneNumber(String uid) async {
+    try {
+      // 1. 'users' 컬렉션에서 `doc(uid).get()`으로 사용자 문서를 가져옴.
+      final userDoc = _firestore.collection('users').doc(uid);
+      final docSnapshot = await userDoc.get();
+
+      // 2. 문서가 존재하고, `doc.data()` 안에 'phoneNumber' 필드가 '존재하는지' 확인.
+      if (docSnapshot.exists) {
+        final data = docSnapshot.data();
+        // 3. 존재하면 `true`, 존재하지 않으면 `false`를 반환.
+        return data != null &&
+            data.containsKey('phoneNumber') &&
+            data['phoneNumber'] != null;
+      }
+
+      return false;
+    } catch (e) {
+      // 오류 발생 시 false를 반환합니다.
+      // ignore: avoid_print
+      print('Error checking phone number: $e');
+      return false;
+    }
+  }
+
+  /// 사용자의 전화번호를 저장합니다.
+  ///
+  /// [uid] 저장할 사용자의 UID
+  /// [phoneNumber] 저장할 전화번호
+  Future<void> savePhoneNumber(String uid, String phoneNumber) async {
+    try {
+      // 1. 'users' 컬렉션에서 `doc(uid).update()`를 호출.
+      final userDoc = _firestore.collection('users').doc(uid);
+
+      // 2. `{'phoneNumber': phoneNumber}` 데이터를 '업데이트'(추가)함.
+      await userDoc.update({
+        'phoneNumber': phoneNumber,
+      });
+    } catch (e) {
+      // 전화번호 저장 중 오류가 발생한 경우 로깅합니다.
+      // ignore: avoid_print
+      print('Error saving phone number: $e');
       rethrow;
     }
   }

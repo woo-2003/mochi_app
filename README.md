@@ -70,5 +70,36 @@
 3.  **진입점 변경:** `main.dart`의 `home`을 `AuthGate`로 변경하여, 앱 실행 시 인증 게이트가 가장 먼저 실행되도록 수정했습니다.
 4.  **로그아웃 기능:** 테스트를 위해 `AuthService`에 `signOut()` 메서드를 추가했습니다. (Google/Firebase 동시 로그아웃)
 5.  **로그아웃 버튼(UI):** `MapScreen`의 `AppBar`에 로그아웃 테스트용 버튼 UI를 추가했습니다.
-6.  **로그아웃 기능 연결:** `MapScreen`의 AppBar에 로그아웃 버튼 UI를 추가하고, `onPressed`에 `AuthService.signOut()`을 '연결'하여 로그아웃 기능을 '완성'함.
+6.  **로그아웃 기능 연결:** `MapScreen`의 AppBar에 로그아웃 버튼 UI를 추가하고, `onPressed`에 `AuthService.signOut()`을 '연결'하여 로그아웃 기능을 '완성'함. (로그아웃 버튼 클릭 시 AuthGate가 자동으로 로그인 화면으로 라우팅하는 것을 확인함)
 7.  **주석:** 모든 신규 코드에 한국어 주석을 추가했습니다.
+
+## [오퍼레이션 7: 친구 수첩] (2025-11-16)
+
+### 작업 내용
+
+1.  **폴더 구조:** `lib/screens/tabs/friends` 폴더를 신설하여, '친구' 탭의 하위 화면들을 분리했습니다.
+2.  **하위 탭 생성:** `MyFriendsTab`, `AddFriendTab`, `FriendRequestsTab` 3개의 임시 탭 화면을 생성했습니다.
+3.  **TabBar 구현:** `FriendsListScreen`을 `StatefulWidget`으로 변경하고, `TabController`와 `TabBarView`를 사용하여 3개의 하위 탭을 가진 인터페이스를 완성했습니다. (3개 탭 전환 및 애니메이션이 정상 작동하는 것을 확인함)
+4.  **주석:** 모든 신규 코드에 한국어 주석을 추가했습니다.
+
+## [오퍼레이션 8 (수정): 연락처 패키지 교체] (2025-11-16)
+
+### 작업 내용
+
+1.  **문제 발견:** `contacts_service` 패키지(`v0.6.3`)가 4년 전 업데이트가 중단되어, 최신 안드로이드 빌드 시스템의 'Namespace' 요구사항과 호환되지 않는 치명적 오류를 발견함.
+2.  **전략 수정:** 기존 `contacts_service`와 `permission_handler` 패키지를 '폐기'함.
+3.  **패키지 교체:** 유지보수가 잘 되고 권한 처리가 내장된 `flutter_contacts` 패키지로 '교체' 설치함.
+4.  **권한 수정:** `AndroidManifest.xml`에 `WRITE_CONTACTS` 권한을 추가함.
+5.  **로직 수정:** `AddFriendTab` 화면의 로직을 `flutter_contacts`의 `requestPermission()` 및 `getContacts()` 메서드를 사용하도록 전면 수정함. (권한 팝업이 정상 작동하고 연락처 리스트가 표시되는 것을 확인함)
+6.  **[치명적 버그 수정]** AAPT 빌드 오류: `<uses-permission>` 태그가 `<application>` 내부에 잘못 위치했던 문제를 수정함. 모든 권한 태그를 `<manifest>`의 최상위 레벨로 이동시켜 빌드 오류를 해결함.
+7.  **주석:** 모든 신규 코드에 한국어 주석을 추가했습니다.
+
+## [오퍼레이션 9: 전화번호 수집] (2025-11-16)
+
+### 작업 내용
+
+1.  **Firestore 색인:** `users` 컬렉션의 `phoneNumber` 필드는 '단일 필드'로 Firebase가 '자동' 색인함을 확인함. (별도 콘솔 작업 불필요)
+2.  **전화번호 화면:** 신규 사용자의 전화번호를 입력받는 `PhoneVerificationScreen` UI를 생성했습니다.
+3.  **DB 서비스 수정:** `checkIfUserHasPhoneNumber` (확인), `savePhoneNumber` (저장) 메서드를 `DatabaseService`에 추가했습니다.
+4.  **AuthGate 수정:** `StreamBuilder` (로그인)와 `FutureBuilder` (DB 확인)를 '중첩'하여, 신규 사용자가 `PhoneVerificationScreen`을 강제로 거치도록 라우팅 로직을 전면 수정했습니다.
+5.  **주석:** 모든 신규 코드에 한국어 주석을 추가했습니다.

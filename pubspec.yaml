@@ -15,6 +15,8 @@ dependencies:
   google_sign_in: ^6.2.1
   # Firebase 핵심 DB인 Firestore 패키지
   cloud_firestore: ^5.1.0
+  # 연락처 접근 및 권한 요청을 위한 패키지 (최신 유지보수 패키지로 교체)
+  flutter_contacts: ^1.1.8
 
 dev_dependencies:
   flutter_test:
