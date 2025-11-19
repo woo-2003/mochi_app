@@ -7,8 +7,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:location/location.dart';
+import 'package:mochi_app/services/ai_service.dart';
 import 'package:mochi_app/services/auth_service.dart';
 import 'package:mochi_app/services/database_service.dart';
+import 'package:mochi_app/utils/marker_generator.dart';
 
 /// 지도 화면
 ///
@@ -36,6 +38,17 @@ class _MapScreenState extends State<MapScreen> {
 
   // 위치 스트림 구독 관리 변수
   StreamSubscription<LocationData>? _locationSubscription;
+
+  // 상태 옵션 정의 (이모지와 설명)
+  final Map<String, String> _statusOptions = {
+    '🔥': '굽기 (즉시 만남)',
+    '☁️': '말랑 (수신 대기)',
+    '🧊': '단단 (방해 금지)',
+    '🍡': '꼬치 (약속 있음)',
+  };
+
+  // 현재 선택된 상태 (기본값: '말랑')
+  String _currentStatus = '☁️ 말랑 (수신 대기)';
 
   @override
   void initState() {
@@ -92,8 +105,11 @@ class _MapScreenState extends State<MapScreen> {
       // '실시간' 위치 감지 스트림을 '추가'합니다.
       _locationSubscription = _location.onLocationChanged.listen(
         (LocationData currentLocation) {
-          // (1) DB에 내 실시간 위치 업데이트
-          DatabaseService.instance.updateUserLocation(currentLocation);
+          // (1) DB에 내 실시간 위치 업데이트 (현재 상태 포함)
+          DatabaseService.instance.updateUserLocation(
+            currentLocation,
+            status: _currentStatus,
+          );
 
           // (2) TODO: (다음 단계) 친구 마커들도 이 위치 기반으로 다시 그림
         },
@@ -113,6 +129,217 @@ class _MapScreenState extends State<MapScreen> {
   /// GoogleMapController를 초기화하는 콜백 메서드입니다.
   void _onMapCreated(GoogleMapController controller) {
     _mapController = controller;
+  }
+
+  /// 친구 위치 문서들을 기반으로 커스텀 마커를 생성하는 메서드입니다.
+  ///
+  /// [locationDocs] 친구 위치 문서 리스트
+  /// 반환값: 생성된 커스텀 마커 세트
+  Future<Set<Marker>> _buildCustomMarkers(
+      List<QueryDocumentSnapshot> locationDocs) async {
+    final Set<Marker> markers = {};
+
+    for (var doc in locationDocs) {
+      final data = doc.data() as Map<String, dynamic>;
+      final geoPoint = data['position'] as GeoPoint?;
+
+      // GeoPoint가 유효한 경우에만 마커를 추가합니다.
+      if (geoPoint != null) {
+        final latLng = LatLng(geoPoint.latitude, geoPoint.longitude);
+
+        // 친구의 상태와 이름을 가져옵니다.
+        final status = data['status'] as String? ?? '☁️ 말랑 (수신 대기)';
+        final statusEmoji = status.split(' ').first; // 이모지만 추출 (예: '🔥')
+
+        // 친구의 프로필 정보를 가져와서 이름을 가져옵니다.
+        final friendProfile =
+            await DatabaseService.instance.getUserProfile(doc.id);
+        final friendName = friendProfile?.displayName ?? '친구';
+
+        // 커스텀 마커 비트맵 생성
+        final customIcon = await MarkerGenerator.createCustomMarkerBitmap(
+          friendName,
+          statusEmoji,
+        );
+
+        // 마커 추가
+        markers.add(
+          Marker(
+            markerId: MarkerId(doc.id),
+            position: latLng,
+            icon: customIcon,
+            infoWindow: InfoWindow(
+              title: friendName,
+              snippet: status,
+            ),
+          ),
+        );
+      }
+    }
+
+    return markers;
+  }
+
+  /// 상태를 변경하고 즉시 DB에 반영하는 메서드입니다.
+  ///
+  /// [newStatus] 새로 선택한 상태 (예: '🔥 굽기 (즉시 만남)')
+  Future<void> _changeStatus(String newStatus) async {
+    // 1. 상태 변수 업데이트
+    setState(() {
+      _currentStatus = newStatus;
+    });
+
+    // 2. 즉시 DB에 반영 (현재 위치 + 새 상태)
+    try {
+      final locationData = await _location.getLocation();
+      if (locationData.latitude != null && locationData.longitude != null) {
+        await DatabaseService.instance.updateUserLocation(
+          locationData,
+          status: newStatus,
+        );
+      }
+    } catch (e) {
+      // 상태 변경 중 오류가 발생한 경우 로깅합니다.
+      // ignore: avoid_print
+      print('Error updating status: $e');
+    }
+  }
+
+  /// AI를 사용하여 현재 위치와 시간을 기반으로 상태를 추천받는 메서드입니다.
+  Future<void> _requestAIStatusSuggestion() async {
+    // 로딩 인디케이터 표시
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Row(
+          children: [
+            SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            SizedBox(width: 16),
+            Text('AI가 상태를 추천하고 있어요...'),
+          ],
+        ),
+        duration: Duration(seconds: 5),
+      ),
+    );
+
+    try {
+      // 1. 현재 위치 가져오기
+      final locationData = await _location.getLocation();
+      if (locationData.latitude == null || locationData.longitude == null) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('위치를 가져올 수 없습니다.'),
+          ),
+        );
+        return;
+      }
+
+      // 2. AI 서비스를 통해 상태 추천 받기
+      final suggestedStatus = await AIService.instance.suggestStatus(
+        locationData.latitude!,
+        locationData.longitude!,
+      );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
+      // 3. AI 추천 결과를 보여주는 다이얼로그 표시
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: const Text('🤖 AI의 제안'),
+            content: Text(
+              "지금 **'$suggestedStatus'** 상태이신가요?",
+              style: const TextStyle(fontSize: 16),
+            ),
+            actions: [
+              // '아니요' 버튼
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+                child: const Text('아니요'),
+              ),
+              // '네, 변경할게요' 버튼
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  // 상태 변경
+                  _changeStatus(suggestedStatus);
+                },
+                child: const Text('네, 변경할게요'),
+              ),
+            ],
+          );
+        },
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('AI 추천 중 오류가 발생했습니다: $e'),
+        ),
+      );
+    }
+  }
+
+  /// 상태 선택 UI를 하단 시트로 표시하는 메서드입니다.
+  void _showStatusPicker() {
+    showModalBottomSheet(
+      context: context,
+      builder: (BuildContext context) {
+        return Container(
+          padding: const EdgeInsets.symmetric(vertical: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // 제목
+              const Text(
+                '상태 선택',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 16),
+              // 상태 옵션 리스트
+              ListView.builder(
+                shrinkWrap: true,
+                itemCount: _statusOptions.length,
+                itemBuilder: (context, index) {
+                  final emoji = _statusOptions.keys.elementAt(index);
+                  final description = _statusOptions[emoji]!;
+                  final statusText = '$emoji $description';
+
+                  return ListTile(
+                    leading: Text(
+                      emoji,
+                      style: const TextStyle(fontSize: 24),
+                    ),
+                    title: Text(description),
+                    // 현재 선택된 상태인지 확인
+                    selected: _currentStatus == statusText,
+                    onTap: () {
+                      // 상태 변경 및 시트 닫기
+                      _changeStatus(statusText);
+                      Navigator.pop(context);
+                    },
+                  );
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -178,30 +405,45 @@ class _MapScreenState extends State<MapScreen> {
               // --- 여기가 핵심 수정 ---
               // 'builder' 함수 '내부'에서 마커 세트를 '새로' 생성합니다.
               // 'setState'를 호출하지 않습니다. (Reactive 방식)
-              Set<Marker> friendMarkers = {}; // '상태' 변수가 아닌 '로컬' 변수
+              // 커스텀 마커 생성을 위한 FutureBuilder 사용
+              if (locationSnapshot.hasData && locationSnapshot.data!.docs.isNotEmpty) {
+                // 친구 위치 데이터가 있으면, 각 친구에 대해 커스텀 마커를 생성합니다.
+                return FutureBuilder<Set<Marker>>(
+                  future: _buildCustomMarkers(locationSnapshot.data!.docs),
+                  builder: (context, markersSnapshot) {
+                    if (markersSnapshot.connectionState == ConnectionState.waiting) {
+                      // 마커 생성 중일 때는 기본 지도 표시
+                      return GoogleMap(
+                        initialCameraPosition: _kInitialPosition,
+                        mapType: MapType.normal,
+                        myLocationButtonEnabled: true,
+                        myLocationEnabled: true,
+                        zoomControlsEnabled: true,
+                        compassEnabled: true,
+                        onMapCreated: _onMapCreated,
+                        markers: {},
+                      );
+                    }
 
-              if (locationSnapshot.hasData) {
-                // '친구 위치' 데이터가 있으면, 마커 세트를 '채웁니다'.
-                for (var doc in locationSnapshot.data!.docs) {
-                  final data = doc.data() as Map<String, dynamic>;
-                  final geoPoint = data['position'] as GeoPoint?;
+                    // 생성된 커스텀 마커 세트를 사용
+                    final friendMarkers = markersSnapshot.data ?? {};
 
-                  // GeoPoint가 유효한 경우에만 마커를 추가합니다.
-                  if (geoPoint != null) {
-                    final latLng = LatLng(geoPoint.latitude, geoPoint.longitude);
-
-                    // TODO: 'markerId'는 친구의 uid (doc.id)
-                    // TODO: 'icon'은 팀장님의 '모찌' 에셋으로 변경
-                    friendMarkers.add(
-                      Marker(
-                        markerId: MarkerId(doc.id),
-                        position: latLng,
-                        infoWindow: InfoWindow(title: '친구 ${doc.id}'), // 임시
-                      ),
+                    return GoogleMap(
+                      initialCameraPosition: _kInitialPosition,
+                      mapType: MapType.normal,
+                      myLocationButtonEnabled: true,
+                      myLocationEnabled: true,
+                      zoomControlsEnabled: true,
+                      compassEnabled: true,
+                      onMapCreated: _onMapCreated,
+                      markers: friendMarkers,
                     );
-                  }
-                }
+                  },
+                );
               }
+
+              // 친구 위치 데이터가 없을 때는 빈 마커 세트로 지도 표시
+              Set<Marker> friendMarkers = {};
               // --- 여기까지 ---
 
               // 'StreamBuilder'는 'GoogleMap' 위젯을 '반환'합니다.
@@ -227,6 +469,34 @@ class _MapScreenState extends State<MapScreen> {
             },
           );
         },
+      ),
+      // AI 버튼과 상태 변경 버튼을 세로로 배치
+      floatingActionButton: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          // AI 추천 버튼 (위쪽)
+          FloatingActionButton.small(
+            onPressed: _requestAIStatusSuggestion,
+            heroTag: 'ai_btn', // 고유한 heroTag 필요
+            backgroundColor: Colors.white,
+            child: const Icon(Icons.auto_awesome, color: Colors.deepPurple),
+          ),
+          // 간격
+          const SizedBox(height: 10),
+          // 상태 변경 버튼 (아래쪽)
+          FloatingActionButton(
+            onPressed: _showStatusPicker,
+            heroTag: 'status_btn', // 고유한 heroTag 필요
+            child: Text(
+              // 현재 상태의 이모지만 표시 (예: '🔥')
+              _currentStatus.split(' ').first,
+              style: const TextStyle(fontSize: 24),
+            ),
+            tooltip: '상태 변경',
+          ),
+        ],
       ),
     );
   }

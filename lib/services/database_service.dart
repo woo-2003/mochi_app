@@ -334,8 +334,9 @@ class DatabaseService {
   /// 사용자의 현재 위치를 Firestore에 업데이트합니다.
   ///
   /// [locationData] 업데이트할 위치 데이터
+  /// [status] 사용자의 현재 상태 (예: '🔥 굽기', '☁️ 말랑', '🧊 단단', '🍡 꼬치')
   /// `locations` 컬렉션에 `uid`를 문서 ID로 하여 위치 정보를 저장합니다.
-  Future<void> updateUserLocation(LocationData locationData) async {
+  Future<void> updateUserLocation(LocationData locationData, {String? status}) async {
     try {
       // 1. 현재 로그인한 유저의 `uid`를 가져옴.
       final String? currentUserUid = AuthService.currentUser?.uid;
@@ -355,13 +356,27 @@ class DatabaseService {
       // 4. 저장할 데이터:
       //    - 'position': `GeoPoint(locationData.latitude!, locationData.longitude!)`
       //    - 'updatedAt': `Timestamp.now()`
-      await locationsCollection.doc(currentUserUid).set({
+      //    - 'status': 사용자의 현재 상태 (선택 사항)
+      final updateData = <String, dynamic>{
         'position': GeoPoint(
           locationData.latitude!,
           locationData.longitude!,
         ),
         'updatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true)); // merge: true를 사용하여 기존 필드를 유지하면서 업데이트
+      };
+
+      // 상태가 제공된 경우 추가하고, 없으면 기본값 '☁️ 말랑 (수신 대기)'를 설정합니다.
+      if (status != null) {
+        updateData['status'] = status;
+      } else {
+        // 상태가 없으면 기본값 설정 (기존 상태 유지 또는 기본값)
+        updateData['status'] = '☁️ 말랑 (수신 대기)';
+      }
+
+      await locationsCollection.doc(currentUserUid).set(
+        updateData,
+        SetOptions(merge: true), // merge: true를 사용하여 기존 필드를 유지하면서 업데이트
+      );
     } catch (e) {
       // 위치 업데이트 중 오류가 발생한 경우 로깅합니다.
       // ignore: avoid_print

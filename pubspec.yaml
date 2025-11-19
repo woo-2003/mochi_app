@@ -21,6 +21,8 @@ dependencies:
   google_maps_flutter: ^2.6.1
   # 실시간 GPS 위치 추적을 위한 패키지
   location: ^6.0.2
+  # AI 상태 추론을 위한 Gemini 패키지
+  google_generative_ai: ^0.4.4
 
 dev_dependencies:
   flutter_test:

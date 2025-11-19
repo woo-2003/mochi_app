@@ -4,6 +4,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:mochi_app/models/user_model.dart';
+import 'package:mochi_app/screens/chat/chat_screen.dart';
 import 'package:mochi_app/services/database_service.dart';
 
 /// 내 모찌 탭 화면
@@ -84,6 +85,21 @@ class _MyFriendsTabState extends State<MyFriendsTab> {
                     subtitle: Text(userProfile.phoneNumber ?? '전화번호 없음'),
                     leading: const CircleAvatar(
                       child: Icon(Icons.person),
+                    ),
+                    // 채팅 버튼 추가
+                    trailing: IconButton(
+                      icon: const Icon(Icons.chat),
+                      onPressed: () {
+                        // ChatScreen으로 이동 (UserModel 전달)
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => ChatScreen(
+                              targetUser: userProfile,
+                            ),
+                          ),
+                        );
+                      },
                     ),
                   );
                 },
