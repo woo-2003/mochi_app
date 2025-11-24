@@ -2,6 +2,7 @@
 // 비즈니스 로직은 UI와 분리하여 유지보수성을 높이기 위해 서비스 계층으로 구성합니다.
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:kakao_flutter_sdk_user/kakao_flutter_sdk_user.dart' as kakao;
 import 'package:mochi_app/services/database_service.dart';
 
 /// Firebase 인증과 Google 로그인을 담당하는 서비스입니다.
@@ -74,6 +75,88 @@ class AuthService {
     }
   }
 
+  /// 카카오 로그인 흐름을 처리한 뒤 Firebase 사용자 정보를 반환합니다.
+  ///
+  /// 카카오 계정 정보를 이용해 Firebase에 '투명 로그인(Proxy Login)'하는 로직을 구현합니다.
+  Future<User?> signInWithKakao() async {
+    try {
+      // 1. 카카오톡이 설치되어 있는지 확인 (전역 함수 사용)
+      bool isKakaoTalkInstalled = await kakao.isKakaoTalkInstalled();
+
+      if (isKakaoTalkInstalled) {
+        // 2-1. 카카오톡이 설치되어 있으면 카카오톡으로 로그인
+        await kakao.UserApi.instance.loginWithKakaoTalk();
+      } else {
+        // 2-2. 카카오톡이 설치되어 있지 않으면 카카오 계정으로 로그인
+        await kakao.UserApi.instance.loginWithKakaoAccount();
+      }
+
+      // 3. 로그인 성공 시 사용자 정보 가져오기
+      kakao.User kakaoUser = await kakao.UserApi.instance.me();
+      final String kakaoId = kakaoUser.id.toString();
+      final String? nickname = kakaoUser.kakaoAccount?.profile?.nickname;
+
+      // 4. (Firebase 연동 트릭) 카카오 ID를 이용해 가짜 이메일과 비밀번호 생성
+      // 이메일: kakao_{id}@mochi.app
+      // 비밀번호: 카카오 ID를 해시화한 값 (실제로는 사용하지 않지만 Firebase 요구사항)
+      final String proxyEmail = 'kakao_$kakaoId@mochi.app';
+      final String proxyPassword = 'kakao_${kakaoId}_password'; // 간단한 비밀번호 (실제로는 사용 안 함)
+
+      // 5. Firebase Auth로 로그인 시도
+      UserCredential? userCredential;
+      bool isNewUser = false;
+      try {
+        // 기존 계정이 있으면 로그인
+        userCredential = await _firebaseAuth.signInWithEmailAndPassword(
+          email: proxyEmail,
+          password: proxyPassword,
+        );
+      } catch (e) {
+        // 로그인 실패 시 에러 코드 확인 없이 무조건 회원가입 시도
+        try {
+          // 6. 계정이 없으면 새로 생성
+          userCredential = await _firebaseAuth.createUserWithEmailAndPassword(
+            email: proxyEmail,
+            password: proxyPassword,
+          );
+          isNewUser = true; // 회원가입 성공 플래그
+        } catch (createError) {
+          // 회원가입도 실패하면 에러 출력
+          // ignore: avoid_print
+          print('회원가입 실패: $createError');
+          rethrow;
+        }
+      }
+
+      // 7. 사용자 정보 처리
+      if (userCredential.user != null) {
+        // Firebase User의 displayName을 카카오 닉네임으로 업데이트
+        await userCredential.user!.updateDisplayName(nickname ?? '카카오 사용자');
+        // 회원가입 성공 시에만 DB에 저장
+        if (isNewUser) {
+          await DatabaseService.instance.saveUser(userCredential.user!);
+        }
+      }
+
+      return userCredential.user;
+    } on kakao.KakaoException catch (e) {
+      // 카카오 로그인 과정에서 발생한 예외를 로깅합니다.
+      // ignore: avoid_print
+      print('KakaoException: ${e.toString()}');
+      return null;
+    } on FirebaseAuthException catch (e) {
+      // Firebase 인증 과정에서 발생한 예외를 로깅합니다.
+      // ignore: avoid_print
+      print('FirebaseAuthException: ${e.message}');
+      return null;
+    } catch (e) {
+      // 예상치 못한 에러를 대비해 일반 예외도 처리합니다.
+      // ignore: avoid_print
+      print('Unknown error during Kakao sign-in: $e');
+      return null;
+    }
+  }
+
   /// 사용자를 로그아웃 처리합니다.
   ///
   /// Google 계정과 Firebase Auth 양쪽에서 모두 로그아웃하여,
@@ -83,7 +166,16 @@ class AuthService {
       // 1. Google 계정에서 로그아웃 (다시 로그인 팝업을 띄우기 위함)
       await _googleSignIn.signOut();
 
-      // 2. Firebase Auth에서 로그아웃
+      // 2. 카카오 계정에서 로그아웃
+      try {
+        await kakao.UserApi.instance.logout();
+      } catch (e) {
+        // 카카오 로그아웃 실패는 무시 (이미 로그아웃된 경우)
+        // ignore: avoid_print
+        print('Kakao logout error (ignored): $e');
+      }
+
+      // 3. Firebase Auth에서 로그아웃
       await _firebaseAuth.signOut();
     } catch (e) {
       // 로그아웃 과정에서 오류가 발생한 경우 로깅합니다.

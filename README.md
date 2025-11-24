@@ -49,6 +49,25 @@
 8.  **성공:** Google 로그인 팝업 -> 계정 선택 -> **로그인 성공 후 `MainNavigator` (지도 화면)로 자동 전환**되는 것을 확인함.
 9.  **주석:** 모든 신규 코드에 한국어 주석을 추가했습니다.
 
+## [오퍼레이션 4.5: 카카오 로그인] (2025-11-19)
+
+### 작업 내용
+
+1.  **패키지 설치:** `kakao_flutter_sdk_user: ^1.9.0` 패키지를 추가하여 카카오 SDK를 연동했습니다.
+2.  **SDK 초기화:** `main.dart`에서 `KakaoSdk.init(nativeAppKey: 'YOUR_KAKAO_NATIVE_APP_KEY')`를 호출하여 카카오 SDK를 초기화했습니다. (주의: `nativeAppKey`는 팀장님이 직접 입력해야 함)
+3.  **Android 설정:** `AndroidManifest.xml`에 카카오 로그인을 위한 `AuthCodeCustomTabsActivity`를 추가하여 Redirect URI를 처리하도록 설정했습니다.
+4.  **인증 서비스 구현:** `AuthService`에 `signInWithKakao()` 메서드를 구현했습니다. 이 메서드는 다음 로직을 수행합니다:
+    * 카카오톡 설치 여부 확인 (`isKakaoTalkInstalled()`)
+    * 설치되어 있으면 `loginWithKakaoTalk()`, 없으면 `loginWithKakaoAccount()` 호출
+    * 로그인 성공 시 `UserApi.instance.me()`로 사용자 정보(ID, 이메일, 닉네임) 가져오기
+    * 카카오 ID를 이용해 가짜 이메일(`kakao_{id}@mochi.app`)과 비밀번호 생성
+    * `FirebaseAuth`로 `signInWithEmailAndPassword` 시도 (실패 시 `createUserWithEmailAndPassword`로 계정 생성)
+    * `DatabaseService.saveUser` 호출하여 카카오 닉네임 저장
+5.  **로그인 화면 연결:** `LoginScreen`의 카카오 버튼 `onPressed`에 `signInWithKakao()` 로직을 연결했습니다.
+6.  **키 해시 확인:** `LoginScreen`의 `initState`에 `KakaoSdk.origin` 출력 코드를 추가하여 키 해시 확인이 가능하도록 구현했습니다.
+7.  **로그아웃 개선:** `signOut()` 메서드에 카카오 로그아웃 로직을 추가했습니다.
+8.  **주석:** 모든 신규 코드에 한국어 주석을 추가했습니다.
+
 ## [오퍼레이션 5: 데이터베이스 연결] (2025-11-13)
 
 ### 작업 내용
@@ -237,3 +256,36 @@
 2.  **AI 서비스 구현:** `AIService` 클래스를 생성하여 현재 위치(위도/경도)와 시간을 기반으로 사용자 상태를 추천하는 `suggestStatus` 메서드를 구현했습니다. Gemini Pro 모델을 사용하여 4가지 상태(굽기, 말랑, 단단, 꼬치) 중 하나를 추천합니다.
 3.  **UI 구현:** `MapScreen`에 AI 추천 버튼(`FloatingActionButton.small`)을 추가하고, 클릭 시 현재 위치를 가져와 AI 추천을 받은 후 다이얼로그로 결과를 표시하며, 사용자가 원하면 상태를 즉시 변경할 수 있도록 구현했습니다.
 4.  **주석:** 모든 신규 코드에 한국어 주석을 추가했습니다.
+
+## [오퍼레이션 23: 채팅 UI 리마스터] (2025-11-19)
+
+### 작업 내용
+
+1.  **패키지 설치:** `intl: ^0.19.0` 패키지를 추가하여 날짜 및 시간 포맷팅 기능을 제공했습니다.
+2.  **MessageBubble 위젯 생성:** `lib/widgets/chat/message_bubble.dart` 파일을 생성하여 카카오톡 스타일의 세련된 메시지 말풍선 위젯을 구현했습니다. 내 메시지는 오른쪽에 보라색(`Colors.deepPurple`), 상대 메시지는 왼쪽에 회색(`Colors.grey[300]`)으로 표시되며, 카카오톡처럼 특정 모서리만 직각으로 처리했습니다.
+3.  **시간 표시:** `intl` 패키지의 `DateFormat`을 사용하여 메시지 전송 시간을 '오후 2:30' 형식으로 말풍선 바깥쪽 하단에 표시하도록 구현했습니다.
+4.  **프로필 사진:** 상대방 메시지의 경우 말풍선 왼쪽에 작은 `CircleAvatar`를 표시하도록 구현했습니다. (이미지가 없으면 기본 아이콘 표시)
+5.  **채팅 화면 수정:** `ChatScreen`의 기존 투박한 `ListTile` 기반 UI를 제거하고, 새로운 `MessageBubble` 위젯을 사용하도록 전면 수정했습니다. 넉넉한 패딩을 적용하여 보기 편한 UI로 개선했습니다.
+6.  **주석:** 모든 신규 코드에 한국어 주석을 추가했습니다.
+
+## [오퍼레이션 23.5: 버그 수정] (2025-11-19)
+
+### 작업 내용
+
+1.  **로케일 초기화:** `intl` 패키지 사용 시 'Locale data has not been initialized' 오류를 해결하기 위해 `main.dart`에 `initializeDateFormatting('ko_KR', null)` 호출을 추가했습니다.
+2.  **주석:** 모든 신규 코드에 한국어 주석을 추가했습니다.
+
+## [오퍼레이션 24: "푸시 알림 (FCM)"] (2025-11-19)
+
+### 작업 내용
+
+1.  **패키지 설치:** `firebase_messaging: ^15.1.3`과 `flutter_local_notifications: ^17.2.3` 패키지를 추가하여 Firebase Cloud Messaging (FCM) 기능을 연동했습니다.
+2.  **알림 서비스 구현:** `lib/services/notification_service.dart` 파일을 생성하여 `NotificationService` 클래스를 구현했습니다. 이 서비스는 다음 기능을 제공합니다:
+    * 알림 권한 요청 (`requestPermission`)
+    * 포그라운드 메시지 핸들러 (앱 실행 중 알림 수신 및 로컬 알림 표시)
+    * 백그라운드 메시지 핸들러 (`_firebaseMessagingBackgroundHandler` - top-level 함수로 선언)
+    * 알림 탭 핸들러 (앱이 백그라운드에 있을 때 알림 탭 처리)
+    * FCM 토큰 가져오기 및 출력 (테스트용)
+3.  **앱 진입점 수정:** `main.dart`에서 `NotificationService.instance.initialize()`와 `NotificationService.instance.getToken()`을 호출하여 앱 시작 시 알림 서비스를 초기화하고 FCM 토큰을 콘솔에 출력하도록 구현했습니다.
+4.  **로컬 알림 설정:** `flutter_local_notifications`를 사용하여 앱이 실행 중일 때 FCM 메시지를 받으면 상단 알림을 표시하도록 구현했습니다.
+5.  **주석:** 모든 신규 코드에 한국어 주석을 추가했습니다.

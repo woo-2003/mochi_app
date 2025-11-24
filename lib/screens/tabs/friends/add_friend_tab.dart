@@ -87,11 +87,8 @@ class _AddFriendTabState extends State<AddFriendTab> {
           // DB 검색 결과에서 일치하는 친구 찾기
           var matchingFriend = foundFriends.firstWhere(
             (friend) => friend.phoneNumber == contactPhone,
-            orElse: () => UserModel(
-              uid: '',
-              email: '',
-              displayName: '',
-            ), // 빈 UserModel
+            orElse: () =>
+                UserModel(uid: '', email: '', displayName: ''), // 빈 UserModel
           );
 
           if (matchingFriend.uid.isNotEmpty) {
@@ -143,21 +140,17 @@ class _AddFriendTabState extends State<AddFriendTab> {
         _requestedFriendUids.add(friendUid);
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('친구 요청을 보냈습니다.'),
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('친구 요청을 보냈습니다.')));
     } catch (e) {
       if (!mounted) {
         return;
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('친구 요청 전송 중 오류가 발생했습니다: $e'),
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('친구 요청 전송 중 오류가 발생했습니다: $e')));
     }
   }
 
@@ -165,20 +158,12 @@ class _AddFriendTabState extends State<AddFriendTab> {
   Widget build(BuildContext context) {
     // 로딩 중일 때는 로딩 인디케이터를 표시합니다.
     if (_isLoading) {
-      return const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     // 연락처가 없거나 권한이 거부된 경우 메시지를 표시합니다.
     if (_contacts.isEmpty) {
-      return const Scaffold(
-        body: Center(
-          child: Text('연락처가 없거나 권한이 거부되었습니다.'),
-        ),
-      );
+      return const Scaffold(body: Center(child: Text('연락처가 없거나 권한이 거부되었습니다.')));
     }
 
     // 두 섹션을 표시하는 ListView
@@ -191,10 +176,7 @@ class _AddFriendTabState extends State<AddFriendTab> {
               padding: EdgeInsets.all(16.0),
               child: Text(
                 '모찌에 가입한 친구',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
             ),
             ..._foundMochiFriends.asMap().entries.map((entry) {
@@ -228,10 +210,7 @@ class _AddFriendTabState extends State<AddFriendTab> {
               padding: EdgeInsets.all(16.0),
               child: Text(
                 '초대하기',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
             ),
             ..._contactsToInvite.map((contact) {

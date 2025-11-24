@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:mochi_app/screens/main_navigator.dart';
 import 'package:mochi_app/services/auth_service.dart';
 import 'package:mochi_app/widgets/auth/social_login_button.dart';
+import 'package:kakao_flutter_sdk_user/kakao_flutter_sdk_user.dart';
 
 /// 로그인 화면
 ///
@@ -18,6 +19,68 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   // 현재 로그인 시도 중인지 여부를 나타내는 상태 값입니다.
   bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // 카카오 SDK origin 출력 (키 해시 확인용)
+    _printKakaoOrigin();
+  }
+
+  /// 카카오 SDK origin을 출력합니다. (키 해시 확인용)
+  Future<void> _printKakaoOrigin() async {
+    try {
+      // ignore: avoid_print
+      print('Kakao SDK Origin: ${await KakaoSdk.origin}');
+    } catch (e) {
+      // ignore: avoid_print
+      print('Error getting Kakao origin: $e');
+    }
+  }
+
+  /// 카카오 로그인 버튼을 눌렀을 때 실행되는 로직입니다.
+  Future<void> _handleKakaoSignIn() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final user = await AuthService.instance.signInWithKakao();
+
+      if (!mounted) {
+        return;
+      }
+
+      if (user != null) {
+        // 로그인 성공! 메인 화면으로 이동
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute<void>(builder: (_) => const MainNavigator()),
+        );
+      } else {
+        // 로그인 실패. 사용자에게 알림 (예: SnackBar)
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('로그인에 실패했습니다. 다시 시도해 주세요.')),
+        );
+      }
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+
+      // 로그인 실패. 사용자에게 알림 (예: SnackBar)
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('예상치 못한 오류가 발생했습니다. 다시 시도해 주세요.')),
+      );
+    } finally {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
 
   /// Google 로그인 버튼을 눌렀을 때 실행되는 로직입니다.
   Future<void> _handleGoogleSignIn() async {
@@ -103,8 +166,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     icon: Icons.chat,
                     backgroundColor: const Color(0xFFFEE500), // Kakao 브랜드 색상
                     textColor: Colors.black87,
-                    onPressed: () {
-                      // TODO: 카카오 로그인 로직 연결
+                    onPressed: () async {
+                      // 카카오 로그인 버튼 로직
+                      await _handleKakaoSignIn();
                     },
                   ),
                 ],

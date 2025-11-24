@@ -16,6 +16,8 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
+        // Flutter Local Notifications 패키지를 위한 Java 8 Desugaring 지원
+        isCoreLibraryDesugaringEnabled = true
     }
 
     kotlinOptions {
@@ -46,4 +48,9 @@ android {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    // Flutter Local Notifications 패키지를 위한 Java 8 Desugaring 지원
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
 }

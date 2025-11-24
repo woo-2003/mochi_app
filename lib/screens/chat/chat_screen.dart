@@ -7,6 +7,7 @@ import 'package:mochi_app/models/chat_model.dart';
 import 'package:mochi_app/models/user_model.dart';
 import 'package:mochi_app/services/auth_service.dart';
 import 'package:mochi_app/services/chat_service.dart';
+import 'package:mochi_app/widgets/chat/message_bubble.dart';
 
 /// 채팅 화면
 ///
@@ -122,7 +123,8 @@ class _ChatScreenState extends State<ChatScreen> {
                 final messages = snapshot.data!.docs.reversed.toList();
 
                 return ListView.builder(
-                  padding: const EdgeInsets.all(16),
+                  // 넉넉한 패딩으로 보기 편하게 설정
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
                   itemCount: messages.length,
                   itemBuilder: (context, index) {
                     final doc = messages[index];
@@ -130,30 +132,12 @@ class _ChatScreenState extends State<ChatScreen> {
                     final message = ChatMessage.fromMap(data);
                     final isMyMessage = message.senderId == currentUserUid;
 
-                    // 메시지 UI (내 메시지는 오른쪽, 상대 메시지는 왼쪽)
-                    return Align(
-                      alignment: isMyMessage
-                          ? Alignment.centerRight
-                          : Alignment.centerLeft,
-                      child: Container(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: isMyMessage
-                              ? Colors.blue
-                              : Colors.grey[300],
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          message.text,
-                          style: TextStyle(
-                            color: isMyMessage ? Colors.white : Colors.black87,
-                          ),
-                        ),
-                      ),
+                    // 카카오톡 스타일의 MessageBubble 위젯 사용
+                    return MessageBubble(
+                      message: message.text,
+                      isMe: isMyMessage,
+                      userImage: null, // TODO: 상대방 프로필 이미지 URL 추가
+                      timestamp: message.timestamp,
                     );
                   },
                 );
