@@ -368,3 +368,158 @@
     * 현재 사용자 위치 마커를 `markers` 세트에 추가하여 커스텀 이미지 마커 표시
     * 마커 크기는 110픽셀로 설정 (100~120 범위)
 4.  **주석:** 모든 신규 코드에 한국어 주석을 추가했습니다.
+
+## [오퍼레이션 28: 패키지 교체 - location → geolocator] (2025-11-19)
+
+### 작업 내용
+
+1.  **LocationProvider 전면 수정:** `lib/providers/location_provider.dart`를 `geolocator` 패키지만 사용하도록 리팩토링했습니다:
+    * `location` 패키지 import 제거, `geolocator` 패키지만 사용
+    * `LocationData` 타입을 모두 `Position` 타입으로 변경
+    * `Location` 객체 대신 `Geolocator` 클래스의 static 메서드 사용:
+      * `Geolocator.isLocationServiceEnabled()` - GPS 서비스 활성화 확인
+      * `Geolocator.checkPermission()` - 위치 권한 확인
+      * `Geolocator.requestPermission()` - 위치 권한 요청
+      * `Geolocator.getCurrentPosition()` - 현재 위치 가져오기
+      * `Geolocator.getPositionStream()` - 실시간 위치 스트림 구독
+    * `Geolocator.distanceBetween()` 사용하여 거리 계산 로직 간소화
+    * `StreamSubscription<LocationData>` → `StreamSubscription<Position>` 변경
+    * 모든 메서드의 매개변수 및 반환 타입을 `Position`으로 통일
+2.  **DatabaseService 수정:** `lib/services/database_service.dart`의 `updateUserLocation` 메서드를 수정했습니다:
+    * `LocationData` import 제거, `geolocator` 패키지 import 추가
+    * `updateUserLocation` 메서드의 매개변수를 `LocationData`에서 `Position`으로 변경
+    * `latitude`, `longitude` 접근 시 null 체크 제거 (Position은 항상 값이 있음)
+3.  **MapScreen 수정:** `lib/screens/map_screen.dart`에서 `LocationData` 사용 부분을 제거했습니다:
+    * `location` 패키지 import 제거
+    * `_locationDataToPosition` 헬퍼 메서드 제거 (더 이상 필요 없음)
+    * `LocationProvider.currentLocation`이 이제 `Position?`을 반환하므로 직접 사용
+    * 모든 null 체크 로직 간소화 (`Position`은 항상 `latitude`, `longitude` 값이 있음)
+4.  **pubspec.yaml 정리:** `location` 패키지 의존성 제거
+5.  **주석:** 모든 변경 사항에 한국어 주석을 추가했습니다.
+
+### 기술적 개선 사항
+
+*   **타입 안정성 향상:** `Position` 타입은 항상 유효한 좌표값을 보장하므로 null 체크 로직이 간소화되었습니다.
+*   **코드 간소화:** `Geolocator.distanceBetween()` 사용으로 거리 계산 로직이 더 간결해졌습니다.
+*   **패키지 충돌 해결:** `location` 패키지와 `geocoding` 패키지의 클래스 이름 충돌(Ambiguous import) 문제가 해결되었습니다.
+*   **일관성:** 앱 전체에서 `geolocator` 패키지만 사용하여 위치 관련 로직이 통일되었습니다.
+
+## [오퍼레이션 29: 지도 카메라 이동 안정성 개선] (2025-11-19)
+
+### 작업 내용
+
+1.  **상태 변수 개선:** `lib/screens/map_screen.dart`에서 카메라 이동 상태 관리 개선:
+    * `_isFirstLocationLoaded` → `_hasMovedToInitialLocation`으로 변수명 변경 (의도 명확화)
+2.  **안전한 카메라 이동 함수:** `_moveCameraToLocation` → `_moveCameraToPosition`으로 함수명 변경 및 안전성 강화:
+    * `mounted` 및 `_mapController` null 체크 추가
+    * `try-catch` 블록으로 `StateError` 방지 (지도 dispose 후 호출 시에도 안전)
+3.  **타이밍 이슈 해결 (Race Condition 방지):**
+    * `build` 메서드에서 `WidgetsBinding.instance.addPostFrameCallback` 사용하여 화면 렌더링 완료 후 카메라 이동
+    * `mounted` 및 `_hasMovedToInitialLocation` 이중 체크로 중복 이동 방지
+    * `onMapCreated` 콜백에서도 위치 데이터가 이미 있으면 즉시 이동하도록 처리
+4.  **주석:** 모든 변경 사항에 한국어 주석을 추가했습니다.
+
+### 기술적 개선 사항
+
+*   **안정성 향상:** 지도가 dispose된 후에도 `StateError`가 발생하지 않도록 안전하게 처리
+*   **타이밍 개선:** Race Condition 방지로 카메라 이동이 안정적으로 동작
+*   **명확성:** 변수명과 함수명이 의도를 명확히 표현
+
+## [오퍼레이션 30: AI 프롬프트 강화 - 상태 메시지 개선] (2025-11-19)
+
+### 작업 내용
+
+1.  **프롬프트 전면 개선:** `lib/services/gemini_service.dart`의 `guessActivity` 메서드 프롬프트를 강화했습니다:
+    * **페르소나 설정:** "너는 한국인들이 일상에서 자주 쓰는 센스 있고 유쾌한 상태 메시지 작성기야."로 명확히 정의
+    * **입력 정보 구조화:** 위치와 시간을 명확히 구분하여 제공
+    * **요청사항 구체화:**
+      * 딱딱한 표현("업무 중", "이동 중") 지양
+      * 어린 표현("수업 째기") 지양
+      * 누구나 공감할 수 있는 위트 있는 표현 사용
+      * 형식: "한글 3~6글자 + 이모지 1개" (이 포맷만 출력)
+    * **상황별 예시 제공:**
+      * 회사/오피스: "열일 중 🔥", "월급 루팡 🤫"
+      * 식당/번화가: "맛집 탐방 😋", "배에 기름칠 🍖"
+      * 공원/산책로: "광합성 중 🌿", "힐링 타임 ✨"
+      * 집 + 밤/주말: "이불 밖 위험 🛌", "넷플릭스 🍿"
+      * 카페: "커피 수혈 ☕", "여유 만끽 🍰"
+      * 헬스장: "득근 득근 💪"
+      * 기타 상황별 예시 포함
+2.  **결과 정제 로직 개선:**
+    * 추가 패턴 제거 ("상태 메시지:", "상태:", "추천:" 등)
+    * 결과 길이 검증 추가 (15자 초과 시 기본값 반환)
+3.  **주석:** 모든 변경 사항에 한국어 주석을 추가했습니다.
+
+### 기술적 개선 사항
+
+*   **사용자 경험 향상:** "활동 중" 같은 단조로운 응답 대신, 모든 연령대가 공감할 수 있는 위트 있는 상태 메시지 생성
+*   **맥락 이해 개선:** 위치와 시간 정보를 더 효과적으로 활용하여 상황에 맞는 메시지 생성
+*   **일관성:** 프롬프트 형식과 예시를 명확히 제공하여 AI 응답의 일관성 향상
+
+## [오퍼레이션 31: 시연용 데모 모드 구현] (2025-11-19)
+
+### 작업 내용
+
+1.  **데모 친구 마커 생성:** `lib/screens/map_screen.dart`에 `_buildDemoFriendsMarkers()` 메서드를 추가하여 시연 영상 촬영을 위한 가상 친구 3명을 지도에 표시했습니다:
+    * **미소**: 성결대학교 학술정보관 근처 (37.3805, 126.9265) - "과제 폭파 중 💣"
+    * **성결**: 성결대학교 운동장 벤치 (37.3795, 126.9275) - "농구 한 판? 🏀"
+    * **공대**: 학교 앞 카페 (37.3810, 126.9255) - "아아 수혈 시급 ☕"
+2.  **모든 마커에 데모 친구 추가:** 지도의 모든 `markers` Set 생성 지점에 데모 친구 마커를 추가하여 항상 표시되도록 구현
+3.  **주석:** 모든 변경 사항에 한국어 주석을 추가했습니다.
+
+### 기술적 개선 사항
+
+*   **시연 준비:** 실제 친구가 없어도 앱의 기능을 시연할 수 있는 환경 구성
+*   **일관성:** 지도에 항상 4개의 마커(나 + 친구 3명)가 표시되어 꽉 찬 느낌 제공
+
+## [오퍼레이션 32: 마커 디자인 구분 - 나와 친구 마커 분리] (2025-11-19)
+
+### 작업 내용
+
+1.  **아이콘 상태 변수 추가:** `lib/screens/map_screen.dart`에 친구 마커 아이콘을 저장하는 `BitmapDescriptor? _friendMarkerIcon;` 변수 추가
+2.  **이미지 로딩 로직 수정:**
+    * `_loadMyLocationIcon()` → `_loadMarkerIcons()`로 메서드명 변경
+    * `marker_mochi.png` → `_myLocationIcon`에 저장 (내 위치 마커)
+    * `marker_friend.png` → `_friendMarkerIcon`에 저장 (친구 마커)
+    * 두 이미지를 모두 비동기로 로드
+3.  **마커 적용:**
+    * '나(me)' 마커: `icon: _myLocationIcon` 사용
+    * 데모 친구들(미소, 성결, 공대) 마커: `icon: _friendMarkerIcon` 사용
+4.  **pubspec.yaml 업데이트:** `marker_friend.png`를 assets에 등록
+5.  **주석:** 모든 변경 사항에 한국어 주석을 추가했습니다.
+
+### 기술적 개선 사항
+
+*   **시각적 구분:** 지도에서 내 위치와 친구 위치를 마커 디자인으로 명확히 구분 가능
+*   **일관성:** 모든 친구 마커가 동일한 디자인을 사용하여 통일감 제공
+
+## [오퍼레이션 33: 데모 데이터 동기화 - 친구 목록 및 채팅 목록] (2025-11-19)
+
+### 작업 내용
+
+1.  **친구 목록 화면 수정:** `lib/screens/tabs/friends/my_friends_tab.dart`에 데모 친구 3명 추가:
+    * `_getDemoFriends()` 메서드 추가: 미소, 성결, 공대의 이름, 상태 메시지, 전화번호 데이터
+    * 각 친구의 ListTile 구성:
+      * **Leading**: `CircleAvatar` (보라색 배경, 흰색 person 아이콘)
+      * **Title**: 이름 (미소, 성결, 공대)
+      * **Subtitle**: 상태 메시지 (지도와 동일: "과제 폭파 중 💣", "농구 한 판? 🏀", "아아 수혈 시급 ☕")
+      * **Trailing**: 위치 아이콘 (`Icons.location_on`, 빨간색)
+    * 데모 친구는 항상 먼저 표시되고, 실제 친구가 있으면 그 다음에 표시
+    * 데모 친구 클릭 시 SnackBar로 데모 모드 안내
+2.  **채팅 목록 화면 수정:** `lib/screens/chat_list_screen.dart`에 데모 채팅방 3개 추가:
+    * `_getDemoChatRooms()` 메서드 추가: 미소, 성결, 공대와의 데모 채팅방 데이터
+    * 각 채팅방의 ListTile 구성:
+      * **Leading**: `CircleAvatar` (보라색 배경, 흰색 person 아이콘)
+      * **Title**: 이름 (미소, 성결, 공대)
+      * **Subtitle**: 최근 대화 내용 ("야 어디야?", "밥 먹었어?", "지금 가는 중")
+      * **Trailing**: 최근 시간 ("방금", "10분 전", "30분 전")
+    * 데모 채팅방은 항상 먼저 표시되고, 실제 채팅방이 있으면 그 다음에 표시
+    * 데모 채팅방 클릭 시 SnackBar로 데모 모드 안내
+3.  **데이터 통일성:** MapScreen의 데모 친구 이름과 상태 메시지와 동일하게 설정하여 사용자가 탭을 이동해도 동일한 친구 데이터를 인지할 수 있도록 구성
+4.  **주석:** 모든 변경 사항에 한국어 주석을 추가했습니다.
+
+### 기술적 개선 사항
+
+*   **일관성:** 지도, 친구 목록, 채팅 목록 화면에서 동일한 데모 친구 3명(미소, 성결, 공대)이 표시되어 시연 영상 촬영에 적합
+*   **사용자 경험:** 실제 친구가 없어도 앱의 모든 기능을 시연할 수 있는 환경 제공
+*   **데이터 동기화:** 모든 화면에서 동일한 이름과 상태 메시지를 사용하여 일관된 사용자 경험 제공

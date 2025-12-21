@@ -7,14 +7,13 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:mochi_app/services/ai_service.dart';
-import 'package:mochi_app/services/auth_service.dart';
 import 'package:mochi_app/services/database_service.dart';
+import 'package:mochi_app/screens/profile_screen.dart';
 import 'package:mochi_app/utils/marker_generator.dart';
 import 'package:mochi_app/utils/image_utils.dart';
 import 'package:provider/provider.dart';
 import 'package:mochi_app/providers/location_provider.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:location/location.dart';
 
 /// 지도 화면
 ///
@@ -37,11 +36,14 @@ class _MapScreenState extends State<MapScreen> {
   // GoogleMapController를 저장할 변수
   GoogleMapController? _mapController;
 
-  // 첫 번째 위치 로딩 여부를 체크하는 변수
-  bool _isFirstLocationLoaded = false;
+  // 최초 1회 위치로 카메라 이동 여부를 체크하는 변수
+  bool _hasMovedToInitialLocation = false;
 
   // 현재 사용자 위치 마커 아이콘
   BitmapDescriptor? _myLocationIcon;
+
+  // 친구 위치 마커 아이콘
+  BitmapDescriptor? _friendMarkerIcon;
 
   // 상태 옵션 정의 (이모지와 설명)
   final Map<String, String> _statusOptions = {
@@ -55,16 +57,24 @@ class _MapScreenState extends State<MapScreen> {
   void initState() {
     super.initState();
     // 마커 아이콘을 미리 로드
-    _loadMyLocationIcon();
+    _loadMarkerIcons();
   }
 
-  /// 현재 사용자 위치 마커 아이콘을 로드합니다.
-  Future<void> _loadMyLocationIcon() async {
+  /// 현재 사용자 및 친구 위치 마커 아이콘을 로드합니다.
+  Future<void> _loadMarkerIcons() async {
     try {
+      // 내 위치 마커 아이콘 로드
       _myLocationIcon = await getBytesFromAsset(
         'lib/assets/images/marker_mochi.png',
         110, // 적당한 마커 크기 (100~120 범위)
       );
+
+      // 친구 마커 아이콘 로드
+      _friendMarkerIcon = await getBytesFromAsset(
+        'lib/assets/images/marker_friend.png',
+        110, // 적당한 마커 크기 (100~120 범위)
+      );
+
       if (mounted) {
         setState(() {});
       }
@@ -74,65 +84,50 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
-  /// 사용자의 현재 위치로 카메라를 이동시키는 메서드입니다.
+  /// 사용자의 현재 위치로 카메라를 안전하게 이동시키는 메서드입니다.
   ///
   /// [position] 이동할 위치 데이터
-  Future<void> _moveCameraToLocation(Position position) async {
+  Future<void> _moveCameraToPosition(Position position) async {
+    // 안전성 체크: mounted가 false이거나 컨트롤러가 null이면 리턴
     if (!mounted || _mapController == null) return;
 
-    await _mapController!.animateCamera(
-      CameraUpdate.newCameraPosition(
-        CameraPosition(
-          target: LatLng(position.latitude, position.longitude),
-          zoom: 15.5, // 적당한 줌 레벨 설정
+    try {
+      await _mapController!.animateCamera(
+        CameraUpdate.newCameraPosition(
+          CameraPosition(
+            target: LatLng(position.latitude, position.longitude),
+            zoom: 15.5, // 적당한 줌 레벨 설정
+          ),
         ),
-      ),
-    );
-    // 카메라 이동 완료 후 플래그 설정
-    if (mounted) {
-      setState(() {
-        _isFirstLocationLoaded = true;
-      });
+      );
+      // 카메라 이동 완료 후 플래그 설정
+      if (mounted) {
+        setState(() {
+          _hasMovedToInitialLocation = true;
+        });
+      }
+    } catch (e) {
+      // 지도 컨트롤러가 해제된 경우 무시 (StateError 등)
+      // 앱이 죽지 않도록 에러를 무시합니다.
     }
-  }
-
-  /// LocationData를 Position으로 변환하는 헬퍼 메서드입니다.
-  ///
-  /// [locationData] 변환할 LocationData
-  /// 반환값: Position 객체
-  Position _locationDataToPosition(LocationData locationData) {
-    return Position(
-      latitude: locationData.latitude ?? 0.0,
-      longitude: locationData.longitude ?? 0.0,
-      timestamp: DateTime.now(),
-      accuracy: locationData.accuracy ?? 0.0,
-      altitude: locationData.altitude ?? 0.0,
-      altitudeAccuracy: 0.0, // LocationData에는 altitudeAccuracy가 없으므로 기본값 사용
-      heading: locationData.heading ?? 0.0,
-      headingAccuracy: 0.0, // LocationData에는 headingAccuracy가 없으므로 기본값 사용
-      speed: locationData.speed ?? 0.0,
-      speedAccuracy: locationData.speedAccuracy ?? 0.0,
-    );
   }
 
   /// GoogleMapController를 초기화하는 콜백 메서드입니다.
   void _onMapCreated(GoogleMapController controller) {
     _mapController = controller;
 
-    // 컨트롤러가 생성된 후 위치가 이미 로딩되어 있다면 카메라 이동
-    if (!_isFirstLocationLoaded) {
+    // 컨트롤러가 생성된 후 위치가 이미 로딩되어 있다면 즉시 카메라 이동
+    if (!_hasMovedToInitialLocation) {
       final locationProvider = Provider.of<LocationProvider>(
         context,
         listen: false,
       );
-      if (locationProvider.currentLocation != null &&
-          locationProvider.currentLocation!.latitude != null &&
-          locationProvider.currentLocation!.longitude != null) {
+      if (locationProvider.currentLocation != null) {
+        // 화면이 완전히 그려진 후 카메라 이동 (타이밍 이슈 방지)
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          final position = _locationDataToPosition(
-            locationProvider.currentLocation!,
-          );
-          _moveCameraToLocation(position);
+          if (mounted && !_hasMovedToInitialLocation) {
+            _moveCameraToPosition(locationProvider.currentLocation!);
+          }
         });
       }
     }
@@ -143,22 +138,75 @@ class _MapScreenState extends State<MapScreen> {
   /// [locationProvider] 위치 Provider
   /// 반환값: 현재 사용자 위치 마커 (위치가 없으면 null)
   Marker? _buildMyLocationMarker(LocationProvider locationProvider) {
-    if (_myLocationIcon == null ||
-        locationProvider.currentLocation == null ||
-        locationProvider.currentLocation!.latitude == null ||
-        locationProvider.currentLocation!.longitude == null) {
+    if (_myLocationIcon == null || locationProvider.currentLocation == null) {
       return null;
     }
 
     return Marker(
       markerId: const MarkerId('my_location'),
       position: LatLng(
-        locationProvider.currentLocation!.latitude!,
-        locationProvider.currentLocation!.longitude!,
+        locationProvider.currentLocation!.latitude,
+        locationProvider.currentLocation!.longitude,
       ),
       icon: _myLocationIcon!,
-      infoWindow: const InfoWindow(title: '내 위치'),
+      infoWindow: InfoWindow(
+        title: '내 위치',
+        snippet: locationProvider.currentStatus, // AI 추론 상태 표시
+      ),
     );
+  }
+
+  /// 시연 영상 촬영을 위한 데모 모드: 가상 친구 3명의 마커를 생성합니다.
+  ///
+  /// 반환값: 가상 친구 마커 세트 (친구 마커 이미지 사용)
+  Set<Marker> _buildDemoFriendsMarkers() {
+    final Set<Marker> demoMarkers = {};
+
+    // 친구 마커 아이콘이 로드되지 않았으면 빈 세트 반환
+    if (_friendMarkerIcon == null) {
+      return demoMarkers;
+    }
+
+    // 친구 1: 미소 - 성결대학교 학술정보관 근처
+    demoMarkers.add(
+      Marker(
+        markerId: const MarkerId('demo_friend_1'),
+        position: const LatLng(37.3805, 126.9265),
+        icon: _friendMarkerIcon!,
+        infoWindow: const InfoWindow(
+          title: '미소',
+          snippet: '과제 폭파 중 💣',
+        ),
+      ),
+    );
+
+    // 친구 2: 성결 - 성결대학교 운동장 벤치
+    demoMarkers.add(
+      Marker(
+        markerId: const MarkerId('demo_friend_2'),
+        position: const LatLng(37.3795, 126.9275),
+        icon: _friendMarkerIcon!,
+        infoWindow: const InfoWindow(
+          title: '성결',
+          snippet: '농구 한 판? 🏀',
+        ),
+      ),
+    );
+
+    // 친구 3: 공대 - 학교 앞 카페
+    demoMarkers.add(
+      Marker(
+        markerId: const MarkerId('demo_friend_3'),
+        position: const LatLng(37.3810, 126.9255),
+        icon: _friendMarkerIcon!,
+        infoWindow: const InfoWindow(
+          title: '공대',
+          snippet: '아아 수혈 시급 ☕',
+        ),
+      ),
+    );
+
+    return demoMarkers;
   }
 
   /// 친구 위치 문서들을 기반으로 커스텀 마커를 생성하는 메서드입니다.
@@ -250,11 +298,9 @@ class _MapScreenState extends State<MapScreen> {
         context,
         listen: false,
       );
-      final locationData = await locationProvider.getCurrentLocation();
+      final position = await locationProvider.getCurrentLocation();
 
-      if (locationData == null ||
-          locationData.latitude == null ||
-          locationData.longitude == null) {
+      if (position == null) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).hideCurrentSnackBar();
         ScaffoldMessenger.of(
@@ -265,8 +311,8 @@ class _MapScreenState extends State<MapScreen> {
 
       // 2. AI 서비스를 통해 상태 추천 받기
       final suggestedStatus = await AIService.instance.suggestStatus(
-        locationData.latitude!,
-        locationData.longitude!,
+        position.latitude,
+        position.longitude,
       );
 
       if (!mounted) return;
@@ -372,13 +418,31 @@ class _MapScreenState extends State<MapScreen> {
       appBar: AppBar(
         title: const Text('Mochi'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () async {
-              // 로그아웃 버튼 클릭 시 AuthService.signOut() 호출
-              await AuthService.instance.signOut();
-              // AuthGate가 스트림을 감지하고 자동으로 로그인 화면으로 보낼 것임
-            },
+          // 프로필 버튼 (원형 이미지)
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: InkWell(
+              onTap: () {
+                // 프로필 화면으로 이동
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const ProfileScreen(),
+                  ),
+                );
+              },
+              borderRadius: BorderRadius.circular(20),
+              child: CircleAvatar(
+                radius: 20,
+                backgroundImage: const AssetImage(
+                  'lib/assets/images/profile_placeholder.png',
+                ),
+                onBackgroundImageError: (exception, stackTrace) {
+                  // 이미지 로드 실패 시 기본 아이콘 사용
+                },
+                child: const Icon(Icons.person, size: 20),
+              ),
+            ),
           ),
         ],
       ),
@@ -386,16 +450,17 @@ class _MapScreenState extends State<MapScreen> {
       body: Consumer<LocationProvider>(
         builder: (context, locationProvider, child) {
           // 위치가 로딩되었고 아직 카메라를 이동하지 않았다면 자동으로 이동
+          // Race Condition 방지를 위해 addPostFrameCallback 사용
           if (locationProvider.currentLocation != null &&
-              locationProvider.currentLocation!.latitude != null &&
-              locationProvider.currentLocation!.longitude != null &&
-              !_isFirstLocationLoaded &&
+              !_hasMovedToInitialLocation &&
               _mapController != null) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
-              final position = _locationDataToPosition(
-                locationProvider.currentLocation!,
-              );
-              _moveCameraToLocation(position);
+              // 화면이 완전히 그려진 후에만 카메라 이동 (안전성 체크)
+              if (mounted &&
+                  !_hasMovedToInitialLocation &&
+                  locationProvider.currentLocation != null) {
+                _moveCameraToPosition(locationProvider.currentLocation!);
+              }
             });
           }
 
@@ -411,6 +476,8 @@ class _MapScreenState extends State<MapScreen> {
                 if (myLocationMarker != null) {
                   markers.add(myLocationMarker);
                 }
+                // 데모 모드: 가상 친구 3명 추가
+                markers.addAll(_buildDemoFriendsMarkers());
 
                 return GoogleMap(
                   initialCameraPosition: _kInitialPosition,
@@ -437,6 +504,8 @@ class _MapScreenState extends State<MapScreen> {
                 if (myLocationMarker != null) {
                   markers.add(myLocationMarker);
                 }
+                // 데모 모드: 가상 친구 3명 추가
+                markers.addAll(_buildDemoFriendsMarkers());
 
                 return GoogleMap(
                   initialCameraPosition: _kInitialPosition,
@@ -478,6 +547,8 @@ class _MapScreenState extends State<MapScreen> {
                           if (myLocationMarker != null) {
                             markers.add(myLocationMarker);
                           }
+                          // 데모 모드: 가상 친구 3명 추가
+                          markers.addAll(_buildDemoFriendsMarkers());
 
                           return GoogleMap(
                             initialCameraPosition: _kInitialPosition,
@@ -499,6 +570,8 @@ class _MapScreenState extends State<MapScreen> {
                         if (myLocationMarker != null) {
                           friendMarkers.add(myLocationMarker);
                         }
+                        // 데모 모드: 가상 친구 3명 추가
+                        friendMarkers.addAll(_buildDemoFriendsMarkers());
 
                         return GoogleMap(
                           initialCameraPosition: _kInitialPosition,
@@ -522,6 +595,8 @@ class _MapScreenState extends State<MapScreen> {
                   if (myLocationMarker != null) {
                     friendMarkers.add(myLocationMarker);
                   }
+                  // 데모 모드: 가상 친구 3명 추가
+                  friendMarkers.addAll(_buildDemoFriendsMarkers());
                   // --- 여기까지 ---
 
                   // 'StreamBuilder'는 'GoogleMap' 위젯을 '반환'합니다.

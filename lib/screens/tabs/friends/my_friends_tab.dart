@@ -1,11 +1,9 @@
 // 내 모찌 탭 화면
 //
 // 사용자가 추가한 친구(모찌) 목록을 실시간으로 표시하는 화면입니다.
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:mochi_app/models/user_model.dart';
 import 'package:mochi_app/screens/chat/chat_screen.dart';
-import 'package:mochi_app/services/database_service.dart';
 
 /// 내 모찌 탭 화면
 ///
@@ -18,91 +16,64 @@ class MyFriendsTab extends StatefulWidget {
 }
 
 class _MyFriendsTabState extends State<MyFriendsTab> {
+
+  /// 시연용 데모 친구 3명의 데이터를 반환합니다.
+  List<Map<String, String>> _getDemoFriends() {
+    return [
+      {
+        'name': '미소',
+        'status': '과제 폭파 중 💣',
+        'phoneNumber': '010-1234-5678',
+      },
+      {
+        'name': '성결',
+        'status': '농구 한 판? 🏀',
+        'phoneNumber': '010-2345-6789',
+      },
+      {
+        'name': '공대',
+        'status': '아아 수혈 시급 ☕',
+        'phoneNumber': '010-3456-7890',
+      },
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
+    // 시연용: Firebase 연동 일시 중지, 데모 데이터만 표시
+    final demoFriends = _getDemoFriends();
+
     return Scaffold(
-      body: StreamBuilder<QuerySnapshot>(
-        // StreamBuilder의 stream: DatabaseService.getMyFriendsStream()를 호출
-        stream: DatabaseService.instance.getMyFriendsStream(),
-        builder: (context, snapshot) {
-          // 연결 중일 때는 로딩 표시
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(
-              child: CircularProgressIndicator(),
-            );
-          }
-
-          // 에러가 발생한 경우
-          if (snapshot.hasError) {
-            return Center(
-              child: Text('오류가 발생했습니다: ${snapshot.error}'),
-            );
-          }
-
-          // 데이터가 없을 때
-          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return const Center(
-              child: Text('아직 추가된 모찌가 없습니다.'),
-            );
-          }
-
-          // 데이터가 있을 때 ListView.builder로 친구 목록 표시
-          return ListView.builder(
-            itemCount: snapshot.data!.docs.length,
-            itemBuilder: (context, index) {
-              // 1. (StreamBuilder) 'friends' 컬렉션에서 `friendId` (친구의 uid)를 가져옴.
-              final friendDoc = snapshot.data!.docs[index];
-              final friendId = friendDoc.id; // 친구의 uid
-
-              // 2. (FutureBuilder) `DatabaseService.getUserProfile(friendId)`를 호출하여
-              //    '친구의 상세 정보'(이름, 번호)를 가져옴.
-              return FutureBuilder<UserModel?>(
-                future: DatabaseService.instance.getUserProfile(friendId),
-                builder: (context, userSnapshot) {
-                  // 사용자 정보를 가져오는 중
-                  if (userSnapshot.connectionState == ConnectionState.waiting) {
-                    return const ListTile(
-                      leading: CircularProgressIndicator(),
-                      title: Text('친구 정보 로딩 중...'),
-                    );
-                  }
-
-                  // 사용자 정보를 가져오지 못한 경우 (탈퇴한 친구)
-                  final userProfile = userSnapshot.data;
-
-                  // 4. `userProfile`이 `null`일 경우 (탈퇴한 친구), `ListTile(title: Text("알 수 없는 모찌"))`를 표시.
-                  if (userProfile == null) {
-                    return const ListTile(
-                      title: Text('알 수 없는 모찌'),
-                      subtitle: Text('이 친구는 더 이상 존재하지 않습니다.'),
-                    );
-                  }
-
-                  // 3. `userProfile`이 `null`이 아닐 경우 (정상 친구),
-                  //    `ListTile`에 `userProfile.displayName`과 `userProfile.phoneNumber`를 표시.
-                  return ListTile(
-                    title: Text(userProfile.displayName),
-                    subtitle: Text(userProfile.phoneNumber ?? '전화번호 없음'),
-                    leading: const CircleAvatar(
-                      child: Icon(Icons.person),
-                    ),
-                    // 채팅 버튼 추가
-                    trailing: IconButton(
-                      icon: const Icon(Icons.chat),
-                      onPressed: () {
-                        // ChatScreen으로 이동 (UserModel 전달)
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => ChatScreen(
-                              targetUser: userProfile,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  );
-                },
+      body: ListView.builder(
+        itemCount: demoFriends.length,
+        itemBuilder: (context, index) {
+          final demoFriend = demoFriends[index];
+          return ListTile(
+            leading: CircleAvatar(
+              backgroundImage: const AssetImage('lib/assets/images/marker_friend.png'),
+              onBackgroundImageError: (exception, stackTrace) {
+                // 이미지 로드 실패 시 기본 아이콘 사용
+              },
+              child: const Icon(Icons.person, color: Colors.white),
+            ),
+            title: Text(demoFriend['name']!),
+            subtitle: Text(demoFriend['status']!),
+            trailing: const Icon(Icons.location_on, color: Colors.red),
+            onTap: () {
+              // 데모 친구와의 채팅 화면으로 이동 (가짜 UserModel 생성)
+              final demoUser = UserModel(
+                uid: 'demo_${demoFriend['name']}',
+                email: '${demoFriend['name']}@demo.com',
+                displayName: demoFriend['name']!,
+                phoneNumber: demoFriend['phoneNumber'],
+              );
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ChatScreen(
+                    targetUser: demoUser,
+                  ),
+                ),
               );
             },
           );

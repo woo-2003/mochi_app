@@ -2,7 +2,7 @@
 // 사용자 정보 저장 및 조회 등의 데이터베이스 작업을 처리합니다.
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:location/location.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:mochi_app/models/user_model.dart';
 import 'package:mochi_app/services/auth_service.dart';
 
@@ -333,10 +333,10 @@ class DatabaseService {
 
   /// 사용자의 현재 위치를 Firestore에 업데이트합니다.
   ///
-  /// [locationData] 업데이트할 위치 데이터
+  /// [position] 업데이트할 위치 데이터
   /// [status] 사용자의 현재 상태 (예: '🔥 굽기', '☁️ 말랑', '🧊 단단', '🍡 꼬치')
   /// `locations` 컬렉션에 `uid`를 문서 ID로 하여 위치 정보를 저장합니다.
-  Future<void> updateUserLocation(LocationData locationData, {String? status}) async {
+  Future<void> updateUserLocation(Position position, {String? status}) async {
     try {
       // 1. 현재 로그인한 유저의 `uid`를 가져옴.
       final String? currentUserUid = AuthService.currentUser?.uid;
@@ -344,23 +344,18 @@ class DatabaseService {
         throw Exception('로그인이 필요합니다.');
       }
 
-      // 위치 데이터가 유효한지 확인합니다.
-      if (locationData.latitude == null || locationData.longitude == null) {
-        throw Exception('유효하지 않은 위치 데이터입니다.');
-      }
-
       // 2. `locations` 컬렉션을 참조.
       final locationsCollection = _firestore.collection('locations');
 
       // 3. `doc(currentUserUid).set()`을 사용하여 문서를 '덮어쓰기' (업데이트).
       // 4. 저장할 데이터:
-      //    - 'position': `GeoPoint(locationData.latitude!, locationData.longitude!)`
+      //    - 'position': `GeoPoint(position.latitude, position.longitude)`
       //    - 'updatedAt': `Timestamp.now()`
       //    - 'status': 사용자의 현재 상태 (선택 사항)
       final updateData = <String, dynamic>{
         'position': GeoPoint(
-          locationData.latitude!,
-          locationData.longitude!,
+          position.latitude,
+          position.longitude,
         ),
         'updatedAt': FieldValue.serverTimestamp(),
       };

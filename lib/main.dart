@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:mochi_app/screens/auth/auth_gate.dart';
+import 'package:mochi_app/screens/splash_screen.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:mochi_app/firebase_options.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -40,8 +40,8 @@ class MyApp extends StatelessWidget {
           primarySwatch: Colors.deepPurple,
           brightness: Brightness.light,
         ),
-        // 앱의 첫 화면을 '로그인 화면'이 아닌 '인증 게이트'로 변경합니다.
-        home: const AuthGate(),
+        // 앱의 첫 화면을 스플래시 스크린으로 설정
+        home: const SplashScreen(),
       ),
     );
   }

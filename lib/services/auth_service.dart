@@ -100,7 +100,8 @@ class AuthService {
       // 이메일: kakao_{id}@mochi.app
       // 비밀번호: 카카오 ID를 해시화한 값 (실제로는 사용하지 않지만 Firebase 요구사항)
       final String proxyEmail = 'kakao_$kakaoId@mochi.app';
-      final String proxyPassword = 'kakao_${kakaoId}_password'; // 간단한 비밀번호 (실제로는 사용 안 함)
+      final String proxyPassword =
+          'kakao_${kakaoId}_password'; // 간단한 비밀번호 (실제로는 사용 안 함)
 
       // 5. Firebase Auth로 로그인 시도
       UserCredential? userCredential;
