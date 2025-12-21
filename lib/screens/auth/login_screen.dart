@@ -137,11 +137,23 @@ class _LoginScreenState extends State<LoginScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // TODO: 여기에 '모찌' 로고가 들어갈 예정 (팀장님 자산)
-                // 임시로 텍스트 로고를 표시합니다.
-                const Text(
-                  '모찌',
-                  style: TextStyle(fontSize: 48, fontWeight: FontWeight.bold),
+                // 스플래시 로고 이미지 표시
+                Image.asset(
+                  'lib/assets/images/splash_logo.png',
+                  width: 200,
+                  height: 200,
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) {
+                    // 이미지 로드 실패 시 텍스트 로고 표시
+                    return const Text(
+                      '모찌',
+                      style: TextStyle(
+                        fontSize: 48,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.deepPurple,
+                      ),
+                    );
+                  },
                 ),
                 const SizedBox(height: 100),
                 if (_isLoading)

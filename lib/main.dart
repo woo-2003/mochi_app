@@ -37,8 +37,70 @@ class MyApp extends StatelessWidget {
         title: 'Mochi',
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
-          primarySwatch: Colors.deepPurple,
-          brightness: Brightness.light,
+          // 모찌 브랜드 컬러: Deep Purple 계열의 세련된 색상
+          primaryColor: const Color(0xFF6C5CE7),
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: const Color(0xFF6C5CE7),
+            brightness: Brightness.light,
+          ),
+          // AppBar 스타일: 배경색 흰색, 타이틀 검은색, 플랫 디자인
+          appBarTheme: const AppBarTheme(
+            backgroundColor: Colors.white,
+            foregroundColor: Colors.black87,
+            elevation: 0,
+            centerTitle: false,
+            titleTextStyle: TextStyle(
+              color: Colors.black87,
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          // BottomNavigationBar 스타일
+          bottomNavigationBarTheme: BottomNavigationBarThemeData(
+            selectedItemColor: const Color(0xFF6C5CE7),
+            unselectedItemColor: Colors.grey,
+            type: BottomNavigationBarType.fixed,
+            elevation: 8,
+          ),
+          // ElevatedButton 스타일: 메인 컬러 배경, 둥근 모서리
+          elevatedButtonTheme: ElevatedButtonThemeData(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF6C5CE7),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            ),
+          ),
+          // TextButton 스타일
+          textButtonTheme: TextButtonThemeData(
+            style: TextButton.styleFrom(
+              foregroundColor: const Color(0xFF6C5CE7),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          ),
+          // Card 스타일: 입체감과 여백
+          cardTheme: CardThemeData(
+            elevation: 2,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          ),
+          // FloatingActionButton 스타일: 메인 컬러 배경
+          floatingActionButtonTheme: FloatingActionButtonThemeData(
+            backgroundColor: const Color(0xFF6C5CE7),
+            foregroundColor: Colors.white,
+          ),
+          // 폰트 스타일
+          textTheme: const TextTheme(
+            bodyLarge: TextStyle(fontSize: 16),
+            bodyMedium: TextStyle(fontSize: 14),
+            bodySmall: TextStyle(fontSize: 12),
+          ),
         ),
         // 앱의 첫 화면을 스플래시 스크린으로 설정
         home: const SplashScreen(),

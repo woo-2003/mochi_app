@@ -36,6 +36,12 @@ class _ChatScreenState extends State<ChatScreen> {
   /// 데모 친구인지 확인하는 메서드
   bool get _isDemoFriend => widget.targetUser.uid.startsWith('demo_');
 
+  /// 데모 모드에서 사용할 로컬 메시지 리스트 (StatefulWidget으로 관리)
+  List<ChatMessage> _demoMessages = [];
+
+  /// 스크롤 컨트롤러 (메시지 전송 시 자동 스크롤용)
+  final ScrollController _scrollController = ScrollController();
+
   /// 데모 친구의 가상 대화 기록을 반환하는 메서드
   List<ChatMessage> _getDemoMessages(String currentUserUid) {
     final userName = widget.targetUser.displayName;
@@ -112,27 +118,55 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    // 데모 친구인 경우 초기 메시지 로드
+    if (_isDemoFriend) {
+      final currentUserUid = AuthService.currentUser?.uid;
+      if (currentUserUid != null) {
+        _demoMessages = _getDemoMessages(currentUserUid);
+      }
+    }
+  }
+
+  @override
   void dispose() {
     // 메모리 누수를 방지하기 위해 컨트롤러를 정리합니다.
     _messageController.dispose();
+    _scrollController.dispose();
     super.dispose();
+  }
+
+  /// 스크롤을 맨 아래로 이동하는 메서드
+  void _scrollToBottom() {
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    }
   }
 
   /// 데모 친구와의 채팅 화면을 구성하는 메서드
   Widget _buildDemoChatView(String currentUserUid) {
-    final demoMessages = _getDemoMessages(currentUserUid);
-
-    if (demoMessages.isEmpty) {
+    if (_demoMessages.isEmpty) {
       return const Center(
         child: Text('메시지가 없습니다. 메시지를 보내보세요!'),
       );
     }
 
+    // 메시지가 추가될 때마다 스크롤을 맨 아래로 이동
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scrollToBottom();
+    });
+
     return ListView.builder(
+      controller: _scrollController,
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-      itemCount: demoMessages.length,
+      itemCount: _demoMessages.length,
       itemBuilder: (context, index) {
-        final message = demoMessages[index];
+        final message = _demoMessages[index];
         final isMyMessage = message.senderId == currentUserUid;
 
         return MessageBubble(
@@ -154,16 +188,35 @@ class _ChatScreenState extends State<ChatScreen> {
       return;
     }
 
-    // 데모 친구와의 채팅은 실제 전송하지 않고 로컬에만 표시
+    // 데모 친구와의 채팅은 로컬 상태에 추가하여 즉시 표시
     if (_isDemoFriend) {
-      // 데모 모드에서는 메시지 전송 불가 안내
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('데모 모드에서는 메시지를 전송할 수 없습니다.'),
-          duration: Duration(seconds: 2),
-        ),
-      );
+      final currentUserUid = AuthService.currentUser?.uid;
+      if (currentUserUid == null) {
+        _messageController.clear();
+        return;
+      }
+
+      // 로컬 메시지 리스트에 즉시 추가
+      setState(() {
+        _demoMessages.add(
+          ChatMessage(
+            senderId: currentUserUid,
+            text: message,
+            timestamp: Timestamp.now(),
+          ),
+        );
+      });
+
+      // 입력 필드 초기화
       _messageController.clear();
+
+      // 스크롤을 맨 아래로 이동 (메시지 목록이 보이도록)
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollToBottom();
+      });
+
+      // 채팅 목록 화면에 마지막 메시지 업데이트를 알리기 위해 결과 반환 준비
+      // (화면이 닫힐 때 자동으로 반환됨)
       return;
     }
 
@@ -206,8 +259,27 @@ class _ChatScreenState extends State<ChatScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.targetUser.displayName),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            // 뒤로가기 버튼 클릭 시 마지막 메시지 정보를 반환
+            if (_isDemoFriend && _demoMessages.isNotEmpty) {
+              final lastMessage = _demoMessages.last;
+              if (currentUserUid != null && lastMessage.senderId == currentUserUid) {
+                // 내가 보낸 마지막 메시지가 있으면 채팅 목록에 업데이트
+                Navigator.of(context).pop({
+                  'userName': widget.targetUser.displayName,
+                  'lastMessage': lastMessage.text,
+                });
+                return;
+              }
+            }
+            // 마지막 메시지가 없거나 내가 보낸 메시지가 아니면 일반 뒤로가기
+            Navigator.of(context).pop();
+          },
+        ),
       ),
-      body: Column(
+        body: Column(
         children: [
           // 메시지 목록 영역
           Expanded(
@@ -272,7 +344,7 @@ class _ChatScreenState extends State<ChatScreen> {
               color: Colors.white,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.grey.withOpacity(0.2),
+                  color: Colors.grey.withValues(alpha: 0.2),
                   spreadRadius: 1,
                   blurRadius: 3,
                   offset: const Offset(0, -1),

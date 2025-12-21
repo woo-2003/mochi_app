@@ -69,13 +69,23 @@ class ProfileScreen extends StatelessWidget {
                   // 프로필 이미지
                   CircleAvatar(
                     radius: 60,
-                    backgroundImage: const AssetImage(
-                      'lib/assets/images/profile_placeholder.png',
+                    backgroundColor: Colors.deepPurple.shade200,
+                    child: Builder(
+                      builder: (context) {
+                        try {
+                          return const CircleAvatar(
+                            radius: 60,
+                            backgroundImage: AssetImage(
+                              'lib/assets/images/profile_placeholder.png',
+                            ),
+                            onBackgroundImageError: null,
+                            child: Icon(Icons.person, size: 60),
+                          );
+                        } catch (e) {
+                          return const Icon(Icons.person, size: 60, color: Colors.white);
+                        }
+                      },
                     ),
-                    onBackgroundImageError: (exception, stackTrace) {
-                      // 이미지 로드 실패 시 기본 아이콘 사용
-                    },
-                    child: const Icon(Icons.person, size: 60),
                   ),
                   const SizedBox(height: 16),
                   // 이름
@@ -101,7 +111,10 @@ class ProfileScreen extends StatelessWidget {
 
             // 중단: 설정 메뉴
             ListTile(
-              leading: const Icon(Icons.notifications_outlined),
+              leading: Icon(
+                Icons.notifications_outlined,
+                color: Theme.of(context).primaryColor,
+              ),
               title: const Text('공지사항'),
               trailing: const Icon(Icons.chevron_right),
               onTap: () {
@@ -113,7 +126,10 @@ class ProfileScreen extends StatelessWidget {
             ),
             const Divider(height: 1),
             ListTile(
-              leading: const Icon(Icons.people_outline),
+              leading: Icon(
+                Icons.people_outline,
+                color: Theme.of(context).primaryColor,
+              ),
               title: const Text('친구 관리'),
               trailing: const Icon(Icons.chevron_right),
               onTap: () {
@@ -125,7 +141,10 @@ class ProfileScreen extends StatelessWidget {
             ),
             const Divider(height: 1),
             ListTile(
-              leading: const Icon(Icons.info_outline),
+              leading: Icon(
+                Icons.info_outline,
+                color: Theme.of(context).primaryColor,
+              ),
               title: const Text('앱 정보'),
               trailing: const Text(
                 'v1.0.0',

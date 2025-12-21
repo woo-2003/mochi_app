@@ -447,8 +447,10 @@ class _MapScreenState extends State<MapScreen> {
         ],
       ),
       // 1. (Stream 1) '내 친구' 목록을 가져옵니다.
-      body: Consumer<LocationProvider>(
-        builder: (context, locationProvider, child) {
+      body: Stack(
+        children: [
+          Consumer<LocationProvider>(
+            builder: (context, locationProvider, child) {
           // 위치가 로딩되었고 아직 카메라를 이동하지 않았다면 자동으로 이동
           // Race Condition 방지를 위해 addPostFrameCallback 사용
           if (locationProvider.currentLocation != null &&
@@ -623,7 +625,42 @@ class _MapScreenState extends State<MapScreen> {
               );
             },
           );
-        },
+          },
+          ),
+          // 좌측 하단: 내 위치로 이동 버튼 (BottomNavigationBar 위에 배치)
+          Positioned(
+            left: 16,
+            bottom: 80, // BottomNavigationBar 높이(약 56px) + 여백(24px)
+            child: Consumer<LocationProvider>(
+              builder: (context, locationProvider, child) {
+                return FloatingActionButton(
+                  onPressed: () {
+                    // 현재 위치가 있으면 카메라 이동
+                    if (locationProvider.currentLocation != null &&
+                        _mapController != null) {
+                      _moveCameraToPosition(locationProvider.currentLocation!);
+                    } else {
+                      // 위치가 없으면 사용자에게 알림
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('현재 위치를 가져올 수 없습니다.'),
+                        ),
+                      );
+                    }
+                  },
+                  heroTag: 'my_location_btn',
+                  backgroundColor: Theme.of(context).primaryColor,
+                  shape: const CircleBorder(),
+                  tooltip: '내 위치로 이동',
+                  child: const Icon(
+                    Icons.my_location,
+                    color: Colors.white,
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
       ),
       // AI 버튼과 상태 변경 버튼을 세로로 배치
       floatingActionButton: Column(
@@ -635,8 +672,8 @@ class _MapScreenState extends State<MapScreen> {
           FloatingActionButton.small(
             onPressed: _requestAIStatusSuggestion,
             heroTag: 'ai_btn', // 고유한 heroTag 필요
-            backgroundColor: Colors.white,
-            child: const Icon(Icons.auto_awesome, color: Colors.deepPurple),
+            backgroundColor: Theme.of(context).primaryColor,
+            child: const Icon(Icons.auto_awesome, color: Colors.white),
           ),
           // 간격
           const SizedBox(height: 10),

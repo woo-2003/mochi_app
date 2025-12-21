@@ -4,6 +4,7 @@
 import 'package:flutter/material.dart';
 import 'package:mochi_app/models/user_model.dart';
 import 'package:mochi_app/screens/chat/chat_screen.dart';
+import 'package:mochi_app/widgets/empty_state_widget.dart';
 
 /// 내 모찌 탭 화면
 ///
@@ -44,41 +45,76 @@ class _MyFriendsTabState extends State<MyFriendsTab> {
     final demoFriends = _getDemoFriends();
 
     return Scaffold(
-      body: ListView.builder(
-        itemCount: demoFriends.length,
-        itemBuilder: (context, index) {
-          final demoFriend = demoFriends[index];
-          return ListTile(
-            leading: CircleAvatar(
-              backgroundImage: const AssetImage('lib/assets/images/marker_friend.png'),
-              onBackgroundImageError: (exception, stackTrace) {
-                // 이미지 로드 실패 시 기본 아이콘 사용
-              },
-              child: const Icon(Icons.person, color: Colors.white),
-            ),
-            title: Text(demoFriend['name']!),
-            subtitle: Text(demoFriend['status']!),
-            trailing: const Icon(Icons.location_on, color: Colors.red),
-            onTap: () {
-              // 데모 친구와의 채팅 화면으로 이동 (가짜 UserModel 생성)
-              final demoUser = UserModel(
-                uid: 'demo_${demoFriend['name']}',
-                email: '${demoFriend['name']}@demo.com',
-                displayName: demoFriend['name']!,
-                phoneNumber: demoFriend['phoneNumber'],
-              );
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => ChatScreen(
-                    targetUser: demoUser,
+      body: demoFriends.isEmpty
+          ? const EmptyStateWidget(
+              icon: Icons.people_outline,
+              title: '친구가 없습니다',
+              subtitle: '친구를 추가하여 위치를 공유해보세요!',
+            )
+          : ListView.builder(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              itemCount: demoFriends.length,
+              itemBuilder: (context, index) {
+                final demoFriend = demoFriends[index];
+                return Card(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                ),
-              );
-            },
-          );
-        },
-      ),
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    leading: Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Theme.of(context).primaryColor.withValues(alpha: 0.3),
+                          width: 2,
+                        ),
+                      ),
+                      child: CircleAvatar(
+                        backgroundImage: const AssetImage(
+                          'lib/assets/images/marker_friend.png',
+                        ),
+                        onBackgroundImageError: (exception, stackTrace) {
+                          // 이미지 로드 실패 시 기본 아이콘 사용
+                        },
+                        child: const Icon(Icons.person, color: Colors.white),
+                      ),
+                    ),
+                    title: Text(
+                      demoFriend['name']!,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    subtitle: Text(demoFriend['status']!),
+                    trailing: Icon(
+                      Icons.location_on,
+                      color: Theme.of(context).primaryColor,
+                    ),
+                    onTap: () {
+                      // 데모 친구와의 채팅 화면으로 이동 (가짜 UserModel 생성)
+                      final demoUser = UserModel(
+                        uid: 'demo_${demoFriend['name']}',
+                        email: '${demoFriend['name']}@demo.com',
+                        displayName: demoFriend['name']!,
+                        phoneNumber: demoFriend['phoneNumber'],
+                      );
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ChatScreen(
+                            targetUser: demoUser,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                );
+              },
+            ),
     );
   }
 }

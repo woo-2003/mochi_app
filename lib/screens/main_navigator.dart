@@ -33,17 +33,21 @@ class _MainNavigatorState extends State<MainNavigator> {
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         onTap: _onItemTapped,
+        type: BottomNavigationBarType.fixed,
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.map_outlined),
+            activeIcon: Icon(Icons.map),
             label: '지도',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.chat_bubble_outline),
+            activeIcon: Icon(Icons.chat_bubble),
             label: '채팅',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.people_outline),
+            activeIcon: Icon(Icons.people),
             label: '친구',
           ),
         ],

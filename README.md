@@ -523,3 +523,139 @@
 *   **일관성:** 지도, 친구 목록, 채팅 목록 화면에서 동일한 데모 친구 3명(미소, 성결, 공대)이 표시되어 시연 영상 촬영에 적합
 *   **사용자 경험:** 실제 친구가 없어도 앱의 모든 기능을 시연할 수 있는 환경 제공
 *   **데이터 동기화:** 모든 화면에서 동일한 이름과 상태 메시지를 사용하여 일관된 사용자 경험 제공
+
+## [오퍼레이션 34: 시연용 대본(Scenario) 모드 구현] (2025-11-19)
+
+### 작업 내용
+
+1.  **목록 정리:** `ChatListScreen`과 `FriendsScreen`에서 '테스트친구' 데이터를 완전히 삭제하고, 오직 '미소', '성결', '공대' 3명만 남기도록 수정했습니다.
+2.  **채팅방 내부 구현:** `lib/screens/chat/chat_screen.dart`에 데모 친구별 대화 기록을 하드코딩하여 표시하도록 구현했습니다:
+    * **미소**: 과제 관련 대화 4개 ("야 과제 다 했냐?", "아니.. 교수님 진짜 너무하심 ㅠㅠ", "오늘 밤새야겠네 ㅋㅋ 도서관 ㄱ?", "이미 자리 잡음. 빨리 와라")
+    * **성결**: 농구 약속 대화 3개 ("오늘 날씨 좋은데 농구 콜?", "콜. 몇 시에 모임?", "3시에 운동장으로 와. 애들 다 모임")
+    * **공대**: 카페인 부족 대화 3개 ("살려줘... 카페인 부족해", "나 지금 학교 앞 카페임. 아아 사갈까?", "너는 진짜 천사다 😇 사이즈 업 부탁")
+3.  **데모 모드 감지:** `_isDemoFriend` getter를 추가하여 데모 친구인지 확인하고, 데모 친구의 경우 하드코딩된 대화 기록을 표시하도록 구현했습니다.
+4.  **메시지 전송 처리:** 데모 친구와의 채팅에서는 실제 메시지 전송 대신 SnackBar로 안내 메시지를 표시하도록 수정했습니다.
+5.  **주석:** 모든 변경 사항에 한국어 주석을 추가했습니다.
+
+### 기술적 개선 사항
+
+*   **시연 준비:** 실제 친구와의 채팅이 없어도 앱의 채팅 기능을 시연할 수 있는 환경 구성
+*   **현실감:** 각 데모 친구별로 상황에 맞는 자연스러운 대화 기록 제공
+
+## [오퍼레이션 35: Firebase 연동 일시 중지 및 데모 데이터 강제 적용] (2025-11-19)
+
+### 작업 내용
+
+1.  **ChatListScreen 수정:** `lib/screens/chat_list_screen.dart`를 전면 수정했습니다:
+    * `StreamBuilder` 제거 (Firebase 연동 일시 중지)
+    * `ListView.builder`를 사용하여 하드코딩된 데모 채팅방 3개만 표시
+    * 각 채팅방 데이터: 이름, 마지막 메시지, 시간
+    * 클릭 시 `ChatScreen`으로 이동하며 각 이름에 맞는 대본이 표시됨
+2.  **FriendsScreen 수정:** `lib/screens/tabs/friends/my_friends_tab.dart`를 전면 수정했습니다:
+    * `StreamBuilder` 제거 (Firebase 연동 일시 중지)
+    * `ListView.builder`를 사용하여 하드코딩된 데모 친구 3명만 표시
+    * 각 친구 데이터: 이름, 상태 메시지, 전화번호
+    * 아이콘은 `assets/images/marker_friend.png` 사용
+3.  **목표 달성:** Firebase에 무슨 데이터가 있든 상관없이, 화면에는 오직 데모 친구 3명(미소, 성결, 공대)만 깔끔하게 표시되도록 구현
+4.  **주석:** 모든 변경 사항에 한국어 주석을 추가했습니다.
+
+### 기술적 개선 사항
+
+*   **시연 안정성:** Firebase 데이터와 무관하게 일관된 데모 환경 제공
+*   **예측 가능성:** 시연 영상 촬영 시 항상 동일한 데이터가 표시되어 안정적인 시연 가능
+
+## [오퍼레이션 36: UI/UX Phase 1 구현 - 스플래시, 앱 아이콘, 마이페이지] (2025-11-19)
+
+### 작업 내용
+
+1.  **앱 아이콘 설정:** `pubspec.yaml`에 `flutter_launcher_icons` 패키지를 추가하고 설정 코드를 작성했습니다:
+    * 이미지 경로: `assets/images/app_icon.png`
+    * Android/iOS 모두 지원
+    * 필요한 에셋을 assets에 등록
+2.  **스플래시 스크린 구현:** `lib/screens/splash_screen.dart`를 생성했습니다:
+    * 중앙에 `splash_logo.png` 이미지 표시 (width: 200)
+    * 페이드 인/아웃 애니메이션 적용 (2초)
+    * 배경색: 흰색 (`Colors.white`)
+    * 2초 후 자동으로 `AuthGate`로 이동
+    * `main.dart`의 `home`을 `SplashScreen`으로 변경
+3.  **마이페이지 구현:** `lib/screens/profile_screen.dart`를 생성했습니다:
+    * **AppBar**: 타이틀 "설정", 뒤로가기 버튼
+    * **상단**: 프로필 이미지 (`profile_placeholder.png`) + 이름 + 이메일
+    * **중단**: 공지사항, 친구 관리, 앱 정보 (v1.0.0) ListTile
+    * **하단**: 로그아웃 버튼 (빨간색 텍스트, 중앙 정렬)
+    * 로그아웃 기능 연결 (확인 다이얼로그 포함)
+4.  **지도 화면 연결:** `MapScreen`의 AppBar 우측에 원형 프로필 버튼 추가:
+    * `profile_placeholder.png` 이미지 사용
+    * 클릭 시 `ProfileScreen`으로 네비게이션
+    * 기존 로그아웃 버튼 제거
+5.  **주석:** 모든 변경 사항에 한국어 주석을 추가했습니다.
+
+### 기술적 개선 사항
+
+*   **브랜딩:** 앱 실행 시 스플래시 스크린으로 브랜드 인지도 향상
+*   **사용자 경험:** 마이페이지를 통해 사용자 정보 확인 및 설정 관리 가능
+*   **일관성:** 앱 전체에서 프로필 이미지가 통일되게 표시
+
+## [오퍼레이션 37: UI/UX Phase 2 구현 - 테마 브랜딩 및 Empty State UI 개선] (2025-11-19)
+
+### 작업 내용
+
+1.  **테마 및 스타일 통일:** `lib/main.dart`의 `ThemeData`를 전면 수정했습니다:
+    * **메인 컬러**: `Color(0xFF6C5CE7)` (Deep Purple 계열 - 모찌 퍼플)
+    * **AppBar**: 배경색 흰색, 타이틀 검은색, `elevation: 0` (플랫 디자인), 아이콘 색상 검은색
+    * **BottomNavigationBar**: 선택된 아이템은 메인 컬러, 비선택은 회색
+    * **ElevatedButton**: 메인 컬러 배경, 둥근 모서리 (`BorderRadius.circular(12)`)
+    * **FloatingActionButton**: 메인 컬러 배경 (테마 추가)
+    * **Card**: `borderRadius: 16`, `elevation: 2`, 여백 적용
+2.  **EmptyStateWidget 생성:** `lib/widgets/empty_state_widget.dart`를 생성했습니다:
+    * 아이콘 또는 이미지, 제목, 설명을 표시하는 재사용 가능한 위젯
+    * 이미지 로드 실패 시 아이콘으로 대체
+3.  **FriendsScreen 디자인 개선:** `lib/screens/tabs/friends/my_friends_tab.dart` 수정:
+    * ListTile을 Card로 감싸서 입체감 추가
+    * Card `borderRadius: 16` 적용
+    * 프로필 이미지에 메인 컬러 테두리 추가
+    * Empty State 적용 (친구가 없을 때)
+4.  **ChatListScreen 디자인 개선:** `lib/screens/chat_list_screen.dart` 수정:
+    * ListTile을 Card로 감싸서 입체감 추가
+    * Card `borderRadius: 16` 적용
+    * `contentPadding` 여백 적용
+    * 마지막 메시지 시간을 작고 회색 폰트로 표시
+    * 읽지 않은 메시지 배지 표시
+    * Empty State 적용 (채팅방이 없을 때)
+5.  **ProfileScreen 메뉴 아이콘:** 메뉴 리스트 아이콘에 메인 컬러 적용
+6.  **BottomNavigationBar 개선:** 선택된 아이템에 `activeIcon` 추가 (아이콘 채움 효과)
+7.  **MapScreen FloatingActionButton:** AI 추천 버튼 배경색을 메인 컬러로 변경
+8.  **주석:** 모든 변경 사항에 한국어 주석을 추가했습니다.
+
+### 기술적 개선 사항
+
+*   **브랜드 통일성:** 앱 전체에 모찌 퍼플(`#6C5CE7`) 브랜드 컬러가 통일감 있게 적용
+*   **현대적 디자인:** 리스트 UI가 카드형 디자인으로 개선되어 시각적 완성도 향상
+*   **사용자 경험:** Empty State 위젯으로 데이터가 없을 때도 친절한 안내 제공
+
+## [오퍼레이션 38: '내 위치로 이동' FloatingActionButton 추가] (2025-11-19)
+
+### 작업 내용
+
+1.  **버튼 추가:** `lib/screens/map_screen.dart`에 '내 위치로 이동' FloatingActionButton을 추가했습니다:
+    * **위치**: 화면 우측 하단 (`Positioned` 위젯 사용)
+    * **디자인**:
+      * 배경색: `Theme.of(context).primaryColor` (모찌 퍼플 `#6C5CE7`)
+      * 아이콘: `Icons.my_location` (흰색)
+      * 모양: `CircleBorder()` (둥근 원형)
+      * `heroTag: 'my_location_btn'` (기존 FAB와 충돌 방지)
+2.  **기능 구현:**
+    * 버튼 클릭 시 `LocationProvider`의 `currentLocation`을 사용하여 카메라 이동
+    * `_moveCameraToPosition` 메서드 활용 (기존 메서드 재사용)
+    * 현재 위치가 null인 경우 사용자에게 SnackBar로 알림 표시
+    * `_mapController` null 체크 포함
+3.  **구조 개선:**
+    * `body`를 `Stack`으로 감싸서 지도 위에 버튼 오버레이
+    * 기존 좌측 하단 FAB들(AI 버튼, 상태 변경 버튼)과 분리되어 배치
+4.  **주석:** 모든 변경 사항에 한국어 주석을 추가했습니다.
+
+### 기술적 개선 사항
+
+*   **사용자 경험 향상:** 지도 탐색 후 버튼 한 번 클릭으로 현재 위치로 복귀 가능
+*   **직관적 UI:** 우측 하단에 배치하여 기존 FAB들과 충돌 없이 접근성 향상
+*   **안정성:** null 체크 및 예외 처리로 안전한 동작 보장
