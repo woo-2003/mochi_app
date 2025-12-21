@@ -5,6 +5,8 @@ import 'package:mochi_app/firebase_options.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:mochi_app/services/notification_service.dart';
 import 'package:kakao_flutter_sdk_user/kakao_flutter_sdk_user.dart';
+import 'package:provider/provider.dart';
+import 'package:mochi_app/providers/location_provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -26,15 +28,21 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Mochi',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        primarySwatch: Colors.deepPurple,
-        brightness: Brightness.light,
+    return MultiProvider(
+      providers: [
+        // LocationProvider 등록
+        ChangeNotifierProvider(create: (_) => LocationProvider()),
+      ],
+      child: MaterialApp(
+        title: 'Mochi',
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData(
+          primarySwatch: Colors.deepPurple,
+          brightness: Brightness.light,
+        ),
+        // 앱의 첫 화면을 '로그인 화면'이 아닌 '인증 게이트'로 변경합니다.
+        home: const AuthGate(),
       ),
-      // 앱의 첫 화면을 '로그인 화면'이 아닌 '인증 게이트'로 변경합니다.
-      home: const AuthGate(),
     );
   }
 }

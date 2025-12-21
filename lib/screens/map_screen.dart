@@ -6,11 +6,15 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:location/location.dart';
 import 'package:mochi_app/services/ai_service.dart';
 import 'package:mochi_app/services/auth_service.dart';
 import 'package:mochi_app/services/database_service.dart';
 import 'package:mochi_app/utils/marker_generator.dart';
+import 'package:mochi_app/utils/image_utils.dart';
+import 'package:provider/provider.dart';
+import 'package:mochi_app/providers/location_provider.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:location/location.dart';
 
 /// 지도 화면
 ///
@@ -33,11 +37,11 @@ class _MapScreenState extends State<MapScreen> {
   // GoogleMapController를 저장할 변수
   GoogleMapController? _mapController;
 
-  // Location 인스턴스
-  final Location _location = Location();
+  // 첫 번째 위치 로딩 여부를 체크하는 변수
+  bool _isFirstLocationLoaded = false;
 
-  // 위치 스트림 구독 관리 변수
-  StreamSubscription<LocationData>? _locationSubscription;
+  // 현재 사용자 위치 마커 아이콘
+  BitmapDescriptor? _myLocationIcon;
 
   // 상태 옵션 정의 (이모지와 설명)
   final Map<String, String> _statusOptions = {
@@ -47,88 +51,114 @@ class _MapScreenState extends State<MapScreen> {
     '🍡': '꼬치 (약속 있음)',
   };
 
-  // 현재 선택된 상태 (기본값: '말랑')
-  String _currentStatus = '☁️ 말랑 (수신 대기)';
-
   @override
   void initState() {
     super.initState();
-    // 화면이 초기화될 때 GPS 권한을 요청하고 카메라를 현재 위치로 이동시킵니다.
-    _requestLocationPermissionAndMoveCamera();
+    // 마커 아이콘을 미리 로드
+    _loadMyLocationIcon();
   }
 
-  /// GPS 권한을 요청하고 현재 위치로 카메라를 이동시키는 메서드입니다.
-  Future<void> _requestLocationPermissionAndMoveCamera() async {
+  /// 현재 사용자 위치 마커 아이콘을 로드합니다.
+  Future<void> _loadMyLocationIcon() async {
     try {
-      // 1. GPS 서비스가 켜져 있는지 확인 (location.serviceEnabled())
-      bool serviceEnabled = await _location.serviceEnabled();
-      if (!serviceEnabled) {
-        // 2. 안 켜져 있으면 켜달라고 요청 (location.requestService())
-        serviceEnabled = await _location.requestService();
-        if (!serviceEnabled) {
-          // GPS 서비스를 켜지 않으면 위치를 가져올 수 없습니다.
-          return;
-        }
-      }
-
-      // 3. GPS 권한이 있는지 확인 (location.hasPermission())
-      PermissionStatus permissionGranted = await _location.hasPermission();
-      if (permissionGranted == PermissionStatus.denied) {
-        // 4. 권한이 없으면 요청 (location.requestPermission())
-        permissionGranted = await _location.requestPermission();
-        if (permissionGranted != PermissionStatus.granted) {
-          // 권한이 거부되면 위치를 가져올 수 없습니다.
-          return;
-        }
-      }
-
-      // 5. 모든 것이 '허용(granted)'되면,
-      // 6. '현재 위치' 가져오기 (location.getLocation())
-      LocationData locationData = await _location.getLocation();
-
-      // 7. 'GoogleMapController'를 사용해 '현재 위치'로 카메라를 '애니메이션(animateCamera)' 이동.
-      if (_mapController != null && mounted) {
-        await _mapController!.animateCamera(
-          CameraUpdate.newCameraPosition(
-            CameraPosition(
-              target: LatLng(
-                locationData.latitude ?? _kInitialPosition.target.latitude,
-                locationData.longitude ?? _kInitialPosition.target.longitude,
-              ),
-              zoom: 15.0,
-            ),
-          ),
-        );
-      }
-
-      // '현재 위치'를 가져오는 `location.getLocation()` *'뒤'*에,
-      // '실시간' 위치 감지 스트림을 '추가'합니다.
-      _locationSubscription = _location.onLocationChanged.listen(
-        (LocationData currentLocation) {
-          // (1) DB에 내 실시간 위치 업데이트 (현재 상태 포함)
-          DatabaseService.instance.updateUserLocation(
-            currentLocation,
-            status: _currentStatus,
-          );
-
-          // (2) TODO: (다음 단계) 친구 마커들도 이 위치 기반으로 다시 그림
-        },
-        onError: (error) {
-          // 위치 스트림에서 오류가 발생한 경우 로깅합니다.
-          // ignore: avoid_print
-          print('Error in location stream: $error');
-        },
+      _myLocationIcon = await getBytesFromAsset(
+        'lib/assets/images/marker_mochi.png',
+        110, // 적당한 마커 크기 (100~120 범위)
       );
+      if (mounted) {
+        setState(() {});
+      }
     } catch (e) {
-      // 위치 권한 요청 또는 위치 가져오기 중 오류가 발생한 경우 로깅합니다.
       // ignore: avoid_print
-      print('Error getting location: $e');
+      print('마커 아이콘 로드 실패: $e');
     }
+  }
+
+  /// 사용자의 현재 위치로 카메라를 이동시키는 메서드입니다.
+  ///
+  /// [position] 이동할 위치 데이터
+  Future<void> _moveCameraToLocation(Position position) async {
+    if (!mounted || _mapController == null) return;
+
+    await _mapController!.animateCamera(
+      CameraUpdate.newCameraPosition(
+        CameraPosition(
+          target: LatLng(position.latitude, position.longitude),
+          zoom: 15.5, // 적당한 줌 레벨 설정
+        ),
+      ),
+    );
+    // 카메라 이동 완료 후 플래그 설정
+    if (mounted) {
+      setState(() {
+        _isFirstLocationLoaded = true;
+      });
+    }
+  }
+
+  /// LocationData를 Position으로 변환하는 헬퍼 메서드입니다.
+  ///
+  /// [locationData] 변환할 LocationData
+  /// 반환값: Position 객체
+  Position _locationDataToPosition(LocationData locationData) {
+    return Position(
+      latitude: locationData.latitude ?? 0.0,
+      longitude: locationData.longitude ?? 0.0,
+      timestamp: DateTime.now(),
+      accuracy: locationData.accuracy ?? 0.0,
+      altitude: locationData.altitude ?? 0.0,
+      altitudeAccuracy: 0.0, // LocationData에는 altitudeAccuracy가 없으므로 기본값 사용
+      heading: locationData.heading ?? 0.0,
+      headingAccuracy: 0.0, // LocationData에는 headingAccuracy가 없으므로 기본값 사용
+      speed: locationData.speed ?? 0.0,
+      speedAccuracy: locationData.speedAccuracy ?? 0.0,
+    );
   }
 
   /// GoogleMapController를 초기화하는 콜백 메서드입니다.
   void _onMapCreated(GoogleMapController controller) {
     _mapController = controller;
+
+    // 컨트롤러가 생성된 후 위치가 이미 로딩되어 있다면 카메라 이동
+    if (!_isFirstLocationLoaded) {
+      final locationProvider = Provider.of<LocationProvider>(
+        context,
+        listen: false,
+      );
+      if (locationProvider.currentLocation != null &&
+          locationProvider.currentLocation!.latitude != null &&
+          locationProvider.currentLocation!.longitude != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          final position = _locationDataToPosition(
+            locationProvider.currentLocation!,
+          );
+          _moveCameraToLocation(position);
+        });
+      }
+    }
+  }
+
+  /// 현재 사용자 위치 마커를 생성하는 메서드입니다.
+  ///
+  /// [locationProvider] 위치 Provider
+  /// 반환값: 현재 사용자 위치 마커 (위치가 없으면 null)
+  Marker? _buildMyLocationMarker(LocationProvider locationProvider) {
+    if (_myLocationIcon == null ||
+        locationProvider.currentLocation == null ||
+        locationProvider.currentLocation!.latitude == null ||
+        locationProvider.currentLocation!.longitude == null) {
+      return null;
+    }
+
+    return Marker(
+      markerId: const MarkerId('my_location'),
+      position: LatLng(
+        locationProvider.currentLocation!.latitude!,
+        locationProvider.currentLocation!.longitude!,
+      ),
+      icon: _myLocationIcon!,
+      infoWindow: const InfoWindow(title: '내 위치'),
+    );
   }
 
   /// 친구 위치 문서들을 기반으로 커스텀 마커를 생성하는 메서드입니다.
@@ -136,7 +166,8 @@ class _MapScreenState extends State<MapScreen> {
   /// [locationDocs] 친구 위치 문서 리스트
   /// 반환값: 생성된 커스텀 마커 세트
   Future<Set<Marker>> _buildCustomMarkers(
-      List<QueryDocumentSnapshot> locationDocs) async {
+    List<QueryDocumentSnapshot> locationDocs,
+  ) async {
     final Set<Marker> markers = {};
 
     for (var doc in locationDocs) {
@@ -152,8 +183,9 @@ class _MapScreenState extends State<MapScreen> {
         final statusEmoji = status.split(' ').first; // 이모지만 추출 (예: '🔥')
 
         // 친구의 프로필 정보를 가져와서 이름을 가져옵니다.
-        final friendProfile =
-            await DatabaseService.instance.getUserProfile(doc.id);
+        final friendProfile = await DatabaseService.instance.getUserProfile(
+          doc.id,
+        );
         final friendName = friendProfile?.displayName ?? '친구';
 
         // 커스텀 마커 비트맵 생성
@@ -168,10 +200,7 @@ class _MapScreenState extends State<MapScreen> {
             markerId: MarkerId(doc.id),
             position: latLng,
             icon: customIcon,
-            infoWindow: InfoWindow(
-              title: friendName,
-              snippet: status,
-            ),
+            infoWindow: InfoWindow(title: friendName, snippet: status),
           ),
         );
       }
@@ -184,25 +213,14 @@ class _MapScreenState extends State<MapScreen> {
   ///
   /// [newStatus] 새로 선택한 상태 (예: '🔥 굽기 (즉시 만남)')
   Future<void> _changeStatus(String newStatus) async {
-    // 1. 상태 변수 업데이트
-    setState(() {
-      _currentStatus = newStatus;
-    });
+    if (!mounted) return;
 
-    // 2. 즉시 DB에 반영 (현재 위치 + 새 상태)
-    try {
-      final locationData = await _location.getLocation();
-      if (locationData.latitude != null && locationData.longitude != null) {
-        await DatabaseService.instance.updateUserLocation(
-          locationData,
-          status: newStatus,
-        );
-      }
-    } catch (e) {
-      // 상태 변경 중 오류가 발생한 경우 로깅합니다.
-      // ignore: avoid_print
-      print('Error updating status: $e');
-    }
+    final locationProvider = Provider.of<LocationProvider>(
+      context,
+      listen: false,
+    );
+    // Provider의 changeStatus 메서드를 호출하여 상태 변경 및 DB 업데이트
+    await locationProvider.changeStatus(newStatus);
   }
 
   /// AI를 사용하여 현재 위치와 시간을 기반으로 상태를 추천받는 메서드입니다.
@@ -227,16 +245,21 @@ class _MapScreenState extends State<MapScreen> {
     );
 
     try {
-      // 1. 현재 위치 가져오기
-      final locationData = await _location.getLocation();
-      if (locationData.latitude == null || locationData.longitude == null) {
+      // 1. Provider에서 현재 위치 가져오기
+      final locationProvider = Provider.of<LocationProvider>(
+        context,
+        listen: false,
+      );
+      final locationData = await locationProvider.getCurrentLocation();
+
+      if (locationData == null ||
+          locationData.latitude == null ||
+          locationData.longitude == null) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).hideCurrentSnackBar();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('위치를 가져올 수 없습니다.'),
-          ),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('위치를 가져올 수 없습니다.')));
         return;
       }
 
@@ -283,11 +306,9 @@ class _MapScreenState extends State<MapScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('AI 추천 중 오류가 발생했습니다: $e'),
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('AI 추천 중 오류가 발생했습니다: $e')));
     }
   }
 
@@ -296,47 +317,50 @@ class _MapScreenState extends State<MapScreen> {
     showModalBottomSheet(
       context: context,
       builder: (BuildContext context) {
-        return Container(
-          padding: const EdgeInsets.symmetric(vertical: 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // 제목
-              const Text(
-                '상태 선택',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 16),
-              // 상태 옵션 리스트
-              ListView.builder(
-                shrinkWrap: true,
-                itemCount: _statusOptions.length,
-                itemBuilder: (context, index) {
-                  final emoji = _statusOptions.keys.elementAt(index);
-                  final description = _statusOptions[emoji]!;
-                  final statusText = '$emoji $description';
+        return Consumer<LocationProvider>(
+          builder: (context, locationProvider, child) {
+            final currentStatus = locationProvider.currentStatus;
 
-                  return ListTile(
-                    leading: Text(
-                      emoji,
-                      style: const TextStyle(fontSize: 24),
-                    ),
-                    title: Text(description),
-                    // 현재 선택된 상태인지 확인
-                    selected: _currentStatus == statusText,
-                    onTap: () {
-                      // 상태 변경 및 시트 닫기
-                      _changeStatus(statusText);
-                      Navigator.pop(context);
+            return Container(
+              padding: const EdgeInsets.symmetric(vertical: 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // 제목
+                  const Text(
+                    '상태 선택',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 16),
+                  // 상태 옵션 리스트
+                  ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: _statusOptions.length,
+                    itemBuilder: (context, index) {
+                      final emoji = _statusOptions.keys.elementAt(index);
+                      final description = _statusOptions[emoji]!;
+                      final statusText = '$emoji $description';
+
+                      return ListTile(
+                        leading: Text(
+                          emoji,
+                          style: const TextStyle(fontSize: 24),
+                        ),
+                        title: Text(description),
+                        // 현재 선택된 상태인지 확인
+                        selected: currentStatus == statusText,
+                        onTap: () {
+                          // 상태 변경 및 시트 닫기
+                          _changeStatus(statusText);
+                          Navigator.pop(context);
+                        },
+                      );
                     },
-                  );
-                },
+                  ),
+                ],
               ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
@@ -359,112 +383,168 @@ class _MapScreenState extends State<MapScreen> {
         ],
       ),
       // 1. (Stream 1) '내 친구' 목록을 가져옵니다.
-      body: StreamBuilder<QuerySnapshot>(
-        stream: DatabaseService.instance.getMyFriendsStream(), // [Op 14]에서 만듦
-        builder: (context, friendsSnapshot) {
-          // '친구 목록'을 가져오는 중이면, '빈 지도'를 표시
-          if (!friendsSnapshot.hasData) {
-            return GoogleMap(
-              initialCameraPosition: _kInitialPosition,
-              mapType: MapType.normal,
-              myLocationEnabled: true,
-              myLocationButtonEnabled: true,
-              zoomControlsEnabled: true,
-              compassEnabled: true,
-              onMapCreated: _onMapCreated, // 컨트롤러는 유지
-              markers: {}, // 마커 0개
-            );
+      body: Consumer<LocationProvider>(
+        builder: (context, locationProvider, child) {
+          // 위치가 로딩되었고 아직 카메라를 이동하지 않았다면 자동으로 이동
+          if (locationProvider.currentLocation != null &&
+              locationProvider.currentLocation!.latitude != null &&
+              locationProvider.currentLocation!.longitude != null &&
+              !_isFirstLocationLoaded &&
+              _mapController != null) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              final position = _locationDataToPosition(
+                locationProvider.currentLocation!,
+              );
+              _moveCameraToLocation(position);
+            });
           }
 
-          // '친구 목록'을 uid 리스트로 변환
-          final friendUids = friendsSnapshot.data!.docs
-              .map((doc) => doc.id)
-              .toList();
-
-          // 친구가 없는 경우에도 지도를 표시합니다.
-          if (friendUids.isEmpty) {
-            return GoogleMap(
-              initialCameraPosition: _kInitialPosition,
-              mapType: MapType.normal,
-              myLocationEnabled: true,
-              myLocationButtonEnabled: true,
-              zoomControlsEnabled: true,
-              compassEnabled: true,
-              onMapCreated: _onMapCreated,
-              markers: {}, // 마커 0개
-            );
-          }
-
-          // 2. (Stream 2) '친구들의 실시간 위치'를 가져옵니다.
           return StreamBuilder<QuerySnapshot>(
             stream: DatabaseService.instance
-                .getFriendsLocationsStream(friendUids), // [Op 18]에서 만듦
-            builder: (context, locationSnapshot) {
-              // '친구 위치'를 가져오는 중이거나 데이터가 없어도, '지도'는 계속 표시
+                .getMyFriendsStream(), // [Op 14]에서 만듦
+            builder: (context, friendsSnapshot) {
+              // '친구 목록'을 가져오는 중이면, '빈 지도'를 표시
+              if (!friendsSnapshot.hasData) {
+                // 현재 사용자 위치 마커 생성
+                final myLocationMarker = _buildMyLocationMarker(locationProvider);
+                final markers = <Marker>{};
+                if (myLocationMarker != null) {
+                  markers.add(myLocationMarker);
+                }
 
-              // --- 여기가 핵심 수정 ---
-              // 'builder' 함수 '내부'에서 마커 세트를 '새로' 생성합니다.
-              // 'setState'를 호출하지 않습니다. (Reactive 방식)
-              // 커스텀 마커 생성을 위한 FutureBuilder 사용
-              if (locationSnapshot.hasData && locationSnapshot.data!.docs.isNotEmpty) {
-                // 친구 위치 데이터가 있으면, 각 친구에 대해 커스텀 마커를 생성합니다.
-                return FutureBuilder<Set<Marker>>(
-                  future: _buildCustomMarkers(locationSnapshot.data!.docs),
-                  builder: (context, markersSnapshot) {
-                    if (markersSnapshot.connectionState == ConnectionState.waiting) {
-                      // 마커 생성 중일 때는 기본 지도 표시
-                      return GoogleMap(
-                        initialCameraPosition: _kInitialPosition,
-                        mapType: MapType.normal,
-                        myLocationButtonEnabled: true,
-                        myLocationEnabled: true,
-                        zoomControlsEnabled: true,
-                        compassEnabled: true,
-                        onMapCreated: _onMapCreated,
-                        markers: {},
-                      );
-                    }
-
-                    // 생성된 커스텀 마커 세트를 사용
-                    final friendMarkers = markersSnapshot.data ?? {};
-
-                    return GoogleMap(
-                      initialCameraPosition: _kInitialPosition,
-                      mapType: MapType.normal,
-                      myLocationButtonEnabled: true,
-                      myLocationEnabled: true,
-                      zoomControlsEnabled: true,
-                      compassEnabled: true,
-                      onMapCreated: _onMapCreated,
-                      markers: friendMarkers,
-                    );
-                  },
+                return GoogleMap(
+                  initialCameraPosition: _kInitialPosition,
+                  mapType: MapType.normal,
+                  myLocationEnabled: false, // 커스텀 마커 사용
+                  myLocationButtonEnabled: true,
+                  zoomControlsEnabled: true,
+                  compassEnabled: true,
+                  onMapCreated: _onMapCreated, // 컨트롤러는 유지
+                  markers: markers,
                 );
               }
 
-              // 친구 위치 데이터가 없을 때는 빈 마커 세트로 지도 표시
-              Set<Marker> friendMarkers = {};
-              // --- 여기까지 ---
+              // '친구 목록'을 uid 리스트로 변환
+              final friendUids = friendsSnapshot.data!.docs
+                  .map((doc) => doc.id)
+                  .toList();
 
-              // 'StreamBuilder'는 'GoogleMap' 위젯을 '반환'합니다.
-              // 'builder'가 재실행될 때마다, '새로운' 마커 세트가 지도에 전달됩니다.
-              return GoogleMap(
-                // 초기 카메라 위치 설정 (서울 시청 근처)
-                initialCameraPosition: _kInitialPosition,
-                // 지도 타입 설정 (일반 지도)
-                mapType: MapType.normal,
-                // 내 위치 버튼 활성화 ('내 위치로 이동' 버튼 활성화)
-                myLocationButtonEnabled: true,
-                // 내 위치 표시 활성화 (내 위치 '파란 점' 활성화)
-                myLocationEnabled: true,
-                // 줌 컨트롤 활성화
-                zoomControlsEnabled: true,
-                // 컴패스 활성화
-                compassEnabled: true,
-                // GoogleMapController를 초기화하는 콜백
-                onMapCreated: _onMapCreated,
-                // '새로' 만든 로컬 마커 세트를 전달 (Reactive 방식)
-                markers: friendMarkers,
+              // 친구가 없는 경우에도 지도를 표시합니다.
+              if (friendUids.isEmpty) {
+                // 현재 사용자 위치 마커 생성
+                final myLocationMarker = _buildMyLocationMarker(locationProvider);
+                final markers = <Marker>{};
+                if (myLocationMarker != null) {
+                  markers.add(myLocationMarker);
+                }
+
+                return GoogleMap(
+                  initialCameraPosition: _kInitialPosition,
+                  mapType: MapType.normal,
+                  myLocationEnabled: false, // 커스텀 마커 사용
+                  myLocationButtonEnabled: true,
+                  zoomControlsEnabled: true,
+                  compassEnabled: true,
+                  onMapCreated: _onMapCreated,
+                  markers: markers,
+                );
+              }
+
+              // 2. (Stream 2) '친구들의 실시간 위치'를 가져옵니다.
+              return StreamBuilder<QuerySnapshot>(
+                stream: DatabaseService.instance.getFriendsLocationsStream(
+                  friendUids,
+                ), // [Op 18]에서 만듦
+                builder: (context, locationSnapshot) {
+                  // '친구 위치'를 가져오는 중이거나 데이터가 없어도, '지도'는 계속 표시
+
+                  // --- 여기가 핵심 수정 ---
+                  // 'builder' 함수 '내부'에서 마커 세트를 '새로' 생성합니다.
+                  // 'setState'를 호출하지 않습니다. (Reactive 방식)
+                  // 커스텀 마커 생성을 위한 FutureBuilder 사용
+                  if (locationSnapshot.hasData &&
+                      locationSnapshot.data!.docs.isNotEmpty) {
+                    // 친구 위치 데이터가 있으면, 각 친구에 대해 커스텀 마커를 생성합니다.
+                    return FutureBuilder<Set<Marker>>(
+                      future: _buildCustomMarkers(locationSnapshot.data!.docs),
+                      builder: (context, markersSnapshot) {
+                        if (markersSnapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          // 마커 생성 중일 때는 기본 지도 표시
+                          // 현재 사용자 위치 마커 생성
+                          final myLocationMarker =
+                              _buildMyLocationMarker(locationProvider);
+                          final markers = <Marker>{};
+                          if (myLocationMarker != null) {
+                            markers.add(myLocationMarker);
+                          }
+
+                          return GoogleMap(
+                            initialCameraPosition: _kInitialPosition,
+                            mapType: MapType.normal,
+                            myLocationButtonEnabled: true,
+                            myLocationEnabled: false, // 커스텀 마커 사용
+                            zoomControlsEnabled: true,
+                            compassEnabled: true,
+                            onMapCreated: _onMapCreated,
+                            markers: markers,
+                          );
+                        }
+
+                        // 생성된 커스텀 마커 세트를 사용
+                        final friendMarkers = markersSnapshot.data ?? {};
+                        // 현재 사용자 위치 마커 추가
+                        final myLocationMarker =
+                            _buildMyLocationMarker(locationProvider);
+                        if (myLocationMarker != null) {
+                          friendMarkers.add(myLocationMarker);
+                        }
+
+                        return GoogleMap(
+                          initialCameraPosition: _kInitialPosition,
+                          mapType: MapType.normal,
+                          myLocationButtonEnabled: true,
+                          myLocationEnabled: false, // 커스텀 마커 사용
+                          zoomControlsEnabled: true,
+                          compassEnabled: true,
+                          onMapCreated: _onMapCreated,
+                          markers: friendMarkers,
+                        );
+                      },
+                    );
+                  }
+
+                  // 친구 위치 데이터가 없을 때는 빈 마커 세트로 지도 표시
+                  Set<Marker> friendMarkers = {};
+                  // 현재 사용자 위치 마커 추가
+                  final myLocationMarker =
+                      _buildMyLocationMarker(locationProvider);
+                  if (myLocationMarker != null) {
+                    friendMarkers.add(myLocationMarker);
+                  }
+                  // --- 여기까지 ---
+
+                  // 'StreamBuilder'는 'GoogleMap' 위젯을 '반환'합니다.
+                  // 'builder'가 재실행될 때마다, '새로운' 마커 세트가 지도에 전달됩니다.
+                  return GoogleMap(
+                    // 초기 카메라 위치 설정 (서울 시청 근처)
+                    initialCameraPosition: _kInitialPosition,
+                    // 지도 타입 설정 (일반 지도)
+                    mapType: MapType.normal,
+                    // 내 위치 버튼 활성화 ('내 위치로 이동' 버튼 활성화)
+                    myLocationButtonEnabled: true,
+                    // 내 위치 표시 비활성화 (커스텀 마커 사용)
+                    myLocationEnabled: false,
+                    // 줌 컨트롤 활성화
+                    zoomControlsEnabled: true,
+                    // 컴패스 활성화
+                    compassEnabled: true,
+                    // GoogleMapController를 초기화하는 콜백
+                    onMapCreated: _onMapCreated,
+                    // '새로' 만든 로컬 마커 세트를 전달 (Reactive 방식)
+                    markers: friendMarkers,
+                  );
+                },
               );
             },
           );
@@ -486,15 +566,19 @@ class _MapScreenState extends State<MapScreen> {
           // 간격
           const SizedBox(height: 10),
           // 상태 변경 버튼 (아래쪽)
-          FloatingActionButton(
-            onPressed: _showStatusPicker,
-            heroTag: 'status_btn', // 고유한 heroTag 필요
-            child: Text(
-              // 현재 상태의 이모지만 표시 (예: '🔥')
-              _currentStatus.split(' ').first,
-              style: const TextStyle(fontSize: 24),
-            ),
-            tooltip: '상태 변경',
+          Consumer<LocationProvider>(
+            builder: (context, locationProvider, child) {
+              return FloatingActionButton(
+                onPressed: _showStatusPicker,
+                heroTag: 'status_btn', // 고유한 heroTag 필요
+                tooltip: '상태 변경',
+                child: Text(
+                  // 현재 상태의 이모지만 표시 (예: '🔥')
+                  locationProvider.currentStatus.split(' ').first,
+                  style: const TextStyle(fontSize: 24),
+                ),
+              );
+            },
           ),
         ],
       ),
@@ -503,9 +587,6 @@ class _MapScreenState extends State<MapScreen> {
 
   @override
   void dispose() {
-    // 화면이 꺼지면(dispose), GPS 스트림을 '취소(cancel)'하여 배터리 낭비를 막습니다.
-    _locationSubscription?.cancel();
-
     // 메모리 누수를 방지하기 위해 컨트롤러를 정리합니다.
     _mapController?.dispose();
     super.dispose();

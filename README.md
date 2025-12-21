@@ -68,6 +68,21 @@
 7.  **로그아웃 개선:** `signOut()` 메서드에 카카오 로그아웃 로직을 추가했습니다.
 8.  **주석:** 모든 신규 코드에 한국어 주석을 추가했습니다.
 
+## [오퍼레이션 4.6: 카카오 로그인 버그 수정] (2025-11-19)
+
+### 작업 내용
+
+1.  **Import 충돌 해결:** `firebase_auth`와 `kakao_flutter_sdk_user` 패키지 모두 `User` 클래스를 가지고 있어서 발생한 이름 충돌(Ambiguous import)을 해결하기 위해 `kakao_flutter_sdk_user` import에 `as kakao` 별칭을 추가했습니다.
+2.  **코드 수정:** 모든 카카오 관련 클래스 사용 시 `kakao.` 접두사를 붙이도록 수정했습니다:
+    * `UserApi` -> `kakao.UserApi`
+    * `User` (카카오 유저) -> `kakao.User`
+    * `KakaoException` -> `kakao.KakaoException`
+3.  **API 변경 대응:** `isKakaoTalkInstalled()` 메서드가 `UserApi`에서 제거되어 전역 함수로 변경된 것을 확인하고, `kakao.isKakaoTalkInstalled()`로 수정했습니다.
+4.  **불필요한 코드 제거:** `unused_local_variable` 경고가 뜬 `token`, `email` 변수를 제거했습니다.
+5.  **Null-aware 연산자 수정:** `invalid_null_aware_operator` 경고가 뜬 `?.` 연산자를 `.`으로 수정했습니다.
+6.  **로그인 로직 개선:** Firebase의 에러 메시지 변경으로 인해 신규 유저가 `signInWithEmailAndPassword` 실패 후 `createUserWithEmailAndPassword`로 넘어가지 못하는 문제를 해결했습니다. 에러 코드 확인 없이 로그인 실패 시 무조건 회원가입을 시도하도록 `try-catch` 로직을 수정했습니다.
+7.  **주석:** 모든 신규 코드에 한국어 주석을 추가했습니다.
+
 ## [오퍼레이션 5: 데이터베이스 연결] (2025-11-13)
 
 ### 작업 내용
@@ -177,7 +192,7 @@
 3.  **'내 모찌' 탭 수정:** `MyFriendsTab`에 `StreamBuilder` (친구 목록)와 `FutureBuilder` (친구 상세 정보)를 '중첩'하여, '나의 친구' 목록이 이름과 전화번호와 함께 표시되도록 UI를 구현했습니다.
 4.  **주석:** 모든 신규 코드에 한국어 주석을 추가했습니다.
 
-## [오퍼레이션 15: "Hello, Map!"] (2025-11-16)
+## [오퍼레이션 15: "Hello, Map!"] (2025-11-17)
 
 ### 작업 내용
 
@@ -218,15 +233,6 @@
 4.  **마커 렌더링:** '친구 위치' `StreamBuilder`의 `builder`가 '실행될 때마다' `Set<Marker>`를 '새로' 생성하여 `GoogleMap` 위젯에 전달, '자동'으로 UI가 갱신되도록 수정했습니다.
 5.  **주석:** 모든 신규 코드에 한국어 주석을 추가했습니다.
 
-## [오퍼레이션 20: "의도 휠" (상태 변경)] (2025-11-19)
-
-### 작업 내용
-
-1.  **상태 옵션 정의:** '굽기', '말랑', '단단', '꼬치' 4가지 상태를 이모지와 함께 정의했습니다.
-2.  **상태 변경 로직:** 상태 선택 시 `_currentStatus` 변수를 갱신하고, 즉시 `DatabaseService.updateUserLocation`을 호출하여 Firestore에 동기화하는 로직을 구현했습니다.
-3.  **UI 구현:** `FloatingActionButton`을 통해 현재 상태를 표시하고, 클릭 시 `showModalBottomSheet`로 상태 선택창을 띄우도록 구현했습니다. (이미지 자산 없이 네이티브 위젯 사용)
-4.  **주석:** 모든 신규 코드에 한국어 주석을 추가했습니다.
-
 ## [오퍼레이션 19: "커스텀 마커 & 상태 표시"] (2025-11-19)
 
 ### 작업 내용
@@ -234,6 +240,15 @@
 1.  **마커 생성 유틸리티:** `MarkerGenerator` 클래스를 생성하여 `PictureRecorder`와 `Canvas`를 사용해 이모지와 텍스트를 결합한 커스텀 마커 비트맵을 실시간으로 생성하는 로직을 구현했습니다.
 2.  **지도 화면 수정:** 기본 '빨간 핀' 대신, 친구의 '상태(이모지)'와 '이름'이 보이는 커스텀 마커를 지도에 표시하도록 `MapScreen`을 수정했습니다.
 3.  **DB 서비스 수정:** `updateUserLocation` 메서드에서 `status` 필드가 누락되어 있을 경우 기본값 '☁️ 말랑 (수신 대기)'를 저장하도록 수정했습니다.
+4.  **주석:** 모든 신규 코드에 한국어 주석을 추가했습니다.
+
+## [오퍼레이션 20: "의도 휠" (상태 변경)] (2025-11-19)
+
+### 작업 내용
+
+1.  **상태 옵션 정의:** '굽기', '말랑', '단단', '꼬치' 4가지 상태를 이모지와 함께 정의했습니다.
+2.  **상태 변경 로직:** 상태 선택 시 `_currentStatus` 변수를 갱신하고, 즉시 `DatabaseService.updateUserLocation`을 호출하여 Firestore에 동기화하는 로직을 구현했습니다.
+3.  **UI 구현:** `FloatingActionButton`을 통해 현재 상태를 표시하고, 클릭 시 `showModalBottomSheet`로 상태 선택창을 띄우도록 구현했습니다. (이미지 자산 없이 네이티브 위젯 사용)
 4.  **주석:** 모든 신규 코드에 한국어 주석을 추가했습니다.
 
 ## [오퍼레이션 21: "실시간 채팅"] (2025-11-19)
@@ -289,3 +304,67 @@
 3.  **앱 진입점 수정:** `main.dart`에서 `NotificationService.instance.initialize()`와 `NotificationService.instance.getToken()`을 호출하여 앱 시작 시 알림 서비스를 초기화하고 FCM 토큰을 콘솔에 출력하도록 구현했습니다.
 4.  **로컬 알림 설정:** `flutter_local_notifications`를 사용하여 앱이 실행 중일 때 FCM 메시지를 받으면 상단 알림을 표시하도록 구현했습니다.
 5.  **주석:** 모든 신규 코드에 한국어 주석을 추가했습니다.
+
+## [오퍼레이션 25: 구조 리팩토링 - Provider 도입] (2025-11-19)
+
+### 작업 내용
+
+1.  **패키지 설치:** `provider: ^6.1.2` 패키지를 `pubspec.yaml`에 추가하여 상태 관리 패턴을 도입했습니다.
+2.  **LocationProvider 생성:** `lib/providers/location_provider.dart` 파일을 생성하여 위치 관련 비즈니스 로직을 분리했습니다. 이 Provider는 다음 기능을 제공합니다:
+    * GPS 권한 요청 및 위치 서비스 활성화
+    * 실시간 위치 스트림 구독 및 관리
+    * 위치 변경 시 Firestore에 자동 업데이트 (`_updateLocation`)
+    * 현재 상태(`_currentStatus`) 관리 및 변경
+    * `ChangeNotifier`를 상속하여 위치 변경 시 `notifyListeners()` 호출
+3.  **Main 등록:** `lib/main.dart`에서 `MultiProvider`로 `MyApp`을 감싸고, `ChangeNotifierProvider<LocationProvider>`를 등록하여 앱 전역에서 위치 상태를 관리할 수 있도록 설정했습니다.
+4.  **MapScreen 리팩토링:** `lib/screens/map_screen.dart`를 수정하여 내부의 위치 관리 로직을 모두 제거하고, 대신 `Provider.of<LocationProvider>` 또는 `Consumer<LocationProvider>`를 사용하여 위치 데이터를 구독하도록 변경했습니다. 주요 변경 사항:
+    * `Location` 인스턴스 및 위치 스트림 구독 제거
+    * `_requestLocationPermissionAndMoveCamera` 메서드 제거
+    * 상태 변경 로직을 Provider의 `changeStatus` 메서드로 위임
+    * AI 추천 시 위치는 Provider에서 가져오도록 수정
+    * 카메라 이동은 Provider의 위치 데이터를 사용
+5.  **코드 품질 향상:** 비즈니스 로직과 UI 로직의 분리로 코드 가독성 및 유지보수성이 크게 향상되었습니다.
+6.  **주석:** 모든 신규 코드에 한국어 주석을 추가했습니다.
+
+## [오퍼레이션 26: 초기 카메라 위치 개선] (2025-11-19)
+
+### 작업 내용
+
+1.  **상태 변수 추가:** `MapScreen`에 `_isFirstLocationLoaded` 변수를 추가하여 앱 실행 후 처음으로 위치를 잡았는지 체크하도록 구현했습니다.
+2.  **자동 카메라 이동 로직:** `build` 메서드 내의 `Consumer<LocationProvider>`에서 위치가 로딩되면 자동으로 사용자의 현재 위치로 카메라를 이동시키는 로직을 추가했습니다:
+    * `locationProvider.currentLocation`이 `null`이 아니고
+    * `_isFirstLocationLoaded`가 `false`일 때만 카메라 이동
+    * 이동 후 `_isFirstLocationLoaded = true`로 설정하여 계속 따라다니지 않도록 함
+3.  **onMapCreated 콜백 개선:** `GoogleMapController`가 생성된 시점에 위치가 이미 로딩되어 있다면 즉시 카메라를 이동하도록 `_onMapCreated` 메서드를 수정했습니다.
+4.  **초기 줌 레벨 설정:** 카메라 이동 시 줌 레벨을 `15.5`로 설정하여 적당한 확대/축소 수준을 제공합니다.
+5.  **UX 개선:** 앱 실행 시 기본 좌표(서울 시청)를 먼저 보여주던 문제를 해결하여, 사용자의 실제 위치가 로딩되면 자동으로 해당 위치로 이동하도록 개선했습니다.
+6.  **주석:** 모든 신규 코드에 한국어 주석을 추가했습니다.
+
+## [오퍼레이션 26.5: 컴파일 에러 수정] (2025-11-19)
+
+### 작업 내용
+
+1.  **타입 불일치 해결:** `_moveCameraToLocation` 함수에서 `LocationData` 타입을 찾을 수 없는 컴파일 에러를 해결하기 위해 `geolocator` 패키지의 `Position` 타입으로 변경했습니다.
+2.  **Import 추가:** `lib/screens/map_screen.dart` 파일에 `import 'package:geolocator/geolocator.dart';`와 `import 'package:location/location.dart';`를 추가했습니다.
+3.  **타입 변환 헬퍼 메서드:** `LocationProvider`가 반환하는 `LocationData` 타입을 `Position` 타입으로 변환하는 `_locationDataToPosition` 헬퍼 메서드를 추가했습니다.
+4.  **함수 시그니처 변경:** `_moveCameraToLocation` 함수의 매개변수 타입을 `LocationData`에서 `Position`으로 변경하고, `latitude`, `longitude` 속성 사용 방식을 유지했습니다.
+5.  **호출부 수정:** `_onMapCreated`와 `Consumer` 내부에서 `LocationData`를 `Position`으로 변환한 후 `_moveCameraToLocation` 함수에 전달하도록 수정했습니다.
+6.  **주석:** 모든 신규 코드에 한국어 주석을 추가했습니다.
+
+## [오퍼레이션 27: 커스텀 마커 적용 - 1단계] (2025-11-19)
+
+### 작업 내용
+
+1.  **pubspec.yaml 설정:** `lib/assets/images/marker_mochi.png` 파일을 assets 섹션에 등록하여 앱에서 사용할 수 있도록 설정했습니다.
+2.  **이미지 유틸리티 생성:** `lib/utils/image_utils.dart` 파일을 생성하여 에셋 이미지를 Google Maps 마커로 사용할 수 있도록 변환하는 `getBytesFromAsset` 함수를 구현했습니다:
+    * 에셋 이미지 경로와 원하는 너비를 받아서 `BitmapDescriptor`로 변환
+    * 이미지 크기를 조절할 수 있도록 `targetWidth` 매개변수 사용
+    * `dart:ui`와 `flutter/services`를 사용하여 이미지 로드 및 변환
+3.  **MapScreen 수정 (내 마커 적용):** `lib/screens/map_screen.dart`에서 현재 사용자의 위치를 표시하는 마커에 커스텀 이미지를 적용했습니다:
+    * `_myLocationIcon` 변수를 추가하여 마커 아이콘을 저장
+    * `initState`에서 `_loadMyLocationIcon()` 메서드를 호출하여 마커 아이콘을 미리 로드 (비동기 처리)
+    * `_buildMyLocationMarker` 메서드를 추가하여 현재 사용자 위치 마커를 생성
+    * 모든 `GoogleMap` 위젯에서 `myLocationEnabled: false`로 변경하여 기본 파란 점 제거
+    * 현재 사용자 위치 마커를 `markers` 세트에 추가하여 커스텀 이미지 마커 표시
+    * 마커 크기는 110픽셀로 설정 (100~120 범위)
+4.  **주석:** 모든 신규 코드에 한국어 주석을 추가했습니다.
