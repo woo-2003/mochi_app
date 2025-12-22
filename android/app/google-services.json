@@ -1,41 +1,42 @@
 {
+  "_comment": "과제 제출용: 이 파일의 모든 민감한 정보는 Placeholder로 마스킹되었습니다. 실제 사용 시에는 Firebase Console에서 새로 다운로드한 google-services.json 파일로 교체해야 합니다.",
   "project_info": {
-    "project_number": "924581846165",
-    "project_id": "mochi2025-99024",
-    "storage_bucket": "mochi2025-99024.firebasestorage.app"
+    "project_number": "YOUR_FIREBASE_PROJECT_NUMBER",
+    "project_id": "YOUR_FIREBASE_PROJECT_ID",
+    "storage_bucket": "YOUR_FIREBASE_STORAGE_BUCKET"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:924581846165:android:f0ef94f6fb405d97a34f9c",
+        "mobilesdk_app_id": "YOUR_FIREBASE_MOBILESDK_APP_ID",
         "android_client_info": {
           "package_name": "com.example.mochi_app"
         }
       },
       "oauth_client": [
         {
-          "client_id": "924581846165-m79dg496dem3rira5bt49u49upd85qju.apps.googleusercontent.com",
+          "client_id": "YOUR_FIREBASE_OAUTH_CLIENT_ID_1",
           "client_type": 1,
           "android_info": {
             "package_name": "com.example.mochi_app",
-            "certificate_hash": "ba857d12d228510e9ad80744ba1f15d908e4b407"
+            "certificate_hash": "YOUR_FIREBASE_CERTIFICATE_HASH"
           }
         },
         {
-          "client_id": "924581846165-i19smicebfgoghpmehbko3in6q94eked.apps.googleusercontent.com",
+          "client_id": "YOUR_FIREBASE_OAUTH_CLIENT_ID_2",
           "client_type": 3
         }
       ],
       "api_key": [
         {
-          "current_key": "AIzaSyCSJSx0Qc1-7Lx7oTm10T0gUM9DhLxNJpQ"
+          "current_key": "YOUR_FIREBASE_API_KEY"
         }
       ],
       "services": {
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "924581846165-i19smicebfgoghpmehbko3in6q94eked.apps.googleusercontent.com",
+              "client_id": "YOUR_FIREBASE_OAUTH_CLIENT_ID_2",
               "client_type": 3
             }
           ]

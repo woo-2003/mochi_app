@@ -48,7 +48,7 @@ class ProfileScreen extends StatelessWidget {
     // 현재 로그인한 사용자 정보 가져오기
     final currentUser = AuthService.currentUser;
     final displayName = currentUser?.displayName ?? '팀장님';
-    final email = currentUser?.email ?? 'teamjang@mochi.com';
+    final email = currentUser?.email ?? 'user@example.com';
 
     return Scaffold(
       appBar: AppBar(

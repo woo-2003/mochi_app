@@ -43,3 +43,18 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Android local.properties (contains user-specific paths and SDK locations)
+android/local.properties
+
+# Build reports (may contain user paths)
+android/build/reports/
+
+# Android local.properties (contains user-specific paths)
+android/local.properties
+android/gradle.properties
+*.iml
+
+# Firebase configuration files (should be regenerated per environment)
+# Note: google-services.json is already masked, but should be regenerated for production
+# ios/Runner/GoogleService-Info.plist

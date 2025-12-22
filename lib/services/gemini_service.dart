@@ -11,8 +11,8 @@ class GeminiService {
   /// 싱글톤 인스턴스
   static final GeminiService instance = GeminiService._internal();
 
-  /// Gemini API 키 (나중에 팀장님이 교체할 곳)
-  static const String apiKey = 'AIzaSyBZyRJrWygtfEHlPELaIx1PeFu90fp-B8c';
+  /// Gemini API 키 (과제 제출용: 실제 키는 YOUR_GEMINI_API_KEY로 교체 필요)
+  static const String apiKey = 'YOUR_GEMINI_API_KEY';
 
   GeminiService._internal();
 
