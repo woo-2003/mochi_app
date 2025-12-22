@@ -11,7 +11,7 @@ class AIService {
   /// 싱글톤 인스턴스
   static final AIService instance = AIService._internal();
 
-  /// Gemini API 키 (과제 제출용: 실제 키는 YOUR_GEMINI_API_KEY로 교체 필요)
+  /// Gemini API 키 (나중에 팀장님이 교체할 곳)
   static const String apiKey = 'YOUR_GEMINI_API_KEY';
 
   AIService._internal();
